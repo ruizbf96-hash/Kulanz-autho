@@ -114,13 +114,13 @@ function initFirebase() {
   }
   try {
     var cfg = {
-      apiKey:"AIzaSyDPsep7yTE-UAjGGSioZfVAozGEo_lSmSQ",
-      authDomain:"demande-kulanzccr.firebaseapp.com",
-      databaseURL:"https://demande-kulanzccr-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId:"demande-kulanzccr",
-      storageBucket:"demande-kulanzccr.firebasestorage.app",
-      messagingSenderId:"128572691256",
-      appId:"1:128572691256:web:43cd3e057b5287199967cd"
+      apiKey:"AIzaSyDUf2WrUO6Lo4I2Dj9hLcEW70tZMHyx3sw",
+      authDomain:"kulanz-autho.firebaseapp.com",
+      databaseURL:"https://kulanz-autho-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:"kulanz-autho",
+      storageBucket:"kulanz-autho.firebasestorage.app",
+      messagingSenderId:"852790118871",
+      appId:"1:852790118871:web:72904a41268839eba12392"
     };
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     db = firebase.database();
