@@ -2,7 +2,25 @@
 
 var SITES     = ['Audi Hœnheim','Audi Obernai','SEAT Hœnheim','SEAT Illkirch','SKODA Hœnheim','SKODA Obernai','VW Bischheim','VW Illkirch','VW Obernai'];
 var KVPS_MAP  = {'Audi Hœnheim':'02155','Audi Obernai':'02486','SEAT Hœnheim':'63930','SEAT Illkirch':'02153','SKODA Hœnheim':'02376','SKODA Obernai':'02485','VW Bischheim':'02154','VW Illkirch':'02153','VW Obernai':'02485'};
-var MOT_DE_PASSE = 'Garantie2026';
+var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
+
+// ═══════════════════════════════════════════════════
+// LISTE BLANCHE TeamGarantie
+// Ajoutez ici les emails qui ont accès TeamGarantie
+// ═══════════════════════════════════════════════════
+var TEAM_EMAILS = [
+  'omar.ruiz@geauto.fr',
+  // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
+];
+
+function isTeamEmail(email) {
+  if (!email) return false;
+  var e = email.toLowerCase().trim();
+  for (var i = 0; i < TEAM_EMAILS.length; i++) {
+    if (TEAM_EMAILS[i].toLowerCase() === e) return true;
+  }
+  return false;
+}
 var WEB3_KEY     = '7bf5b927-e39f-4fc1-9f60-642e4741e445';
 
 // ═══════════════════════════════════════════════════════════
@@ -2138,7 +2156,7 @@ function checkKulanzNok() {
   var tuningBlock = '';
   if (tuningNok) {
     tuningBlock = '<div style="background:#fdf0f0;border:2px solid #c0392b;border-radius:8px;padding:12px 14px;margin-bottom:12px">'
-      + '<div style="font-weight:700;color:#c0392b;font-size:13px;margin-bottom:6px">      Code tuning détecté — KULANZ IMPOSSIBLE</div>'
+      + '<div style="font-weight:700;color:#c0392b;font-size:13px;margin-bottom:6px">������Code tuning détecté — KULANZ IMPOSSIBLE</div>'
       + '<p style="margin:0 0 6px;font-size:12px">Un <strong>code tuning</strong> est présent dans SAGA. '
       + 'Le constructeur n’accorde aucune participation commerciale sur un véhicule avec code tuning actif.</p>'
       + '</div>';
@@ -2252,4 +2270,3 @@ function checkKulanzNok() {
     initFirebase(); // Firebase initialisé dès le chargement
   }
 })();
-
