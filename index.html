@@ -377,7 +377,7 @@ tr:hover td{background:rgba(184,151,58,.03)}
           <div class="lp-card-title">Usager</div>
           <div class="lp-card-desc">Créer et suivre vos demandes Kulanz / CCR</div>
         </div>
-        <div class="lp-card" onclick="openPwdModal()">
+        <div class="lp-card" onclick="showLoginTeam()">
           <div class="lp-card-icon">🔐</div>
           <div class="lp-card-title">TeamGarantie</div>
           <div class="lp-card-desc">Valider les demandes, accéder à l'historique complet</div>
@@ -440,6 +440,30 @@ tr:hover td{background:rgba(184,151,58,.03)}
           Compte inexistant ? Contactez <strong style="color:var(--gold)">teamgarantie@geauto.fr</strong>
         </p>
       </div>
+    </div>
+    <!-- step3: connexion TeamGarantie -->
+    <div id="lp-step3" style="display:none;width:100%">
+      <p style="color:var(--silver);font-size:12px;text-align:center;margin-bottom:16px">
+        Connexion <span style="color:var(--gold);font-weight:700">TeamGarantie</span>
+      </p>
+      <div style="margin-bottom:12px">
+        <label style="color:var(--silver);font-size:11px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">E-mail TeamGarantie</label>
+        <input type="email" id="team-email" placeholder="teamgarantie@geauto.fr"
+          style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:13px;outline:none"
+          onkeydown="if(event.key==='Enter')document.getElementById('team-pwd').focus()">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="color:var(--silver);font-size:11px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Mot de passe</label>
+        <input type="password" id="team-pwd" placeholder="••••••••"
+          style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:13px;outline:none"
+          onkeydown="if(event.key==='Enter')connecterTeam()">
+      </div>
+      <div id="team-error" style="display:none;color:#ff6b6b;font-size:12px;text-align:center;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.3);padding:8px 12px;border-radius:7px;margin-bottom:12px"></div>
+      <button onclick="connecterTeam()"
+        style="width:100%;padding:11px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">
+        Se connecter
+      </button>
+      <button class="lp-back" onclick="showStep1()">← Retour</button>
     </div>
   </div>
 </div>
@@ -1008,6 +1032,11 @@ function connecterUsager() {
   // Validations
   if (!email) { showAuthError('Saisissez votre e-mail.'); document.getElementById('auth-email').focus(); return; }
   if (!email.toLowerCase().endsWith('@geauto.fr')) { showAuthError('Utilisez votre e-mail @geauto.fr'); document.getElementById('auth-email').focus(); return; }
+  // Refuser si c'est un email TeamGarantie (doit passer par le bouton Team)
+  if (typeof isTeamEmail === 'function' && isTeamEmail(email)) {
+    showAuthError('Ce compte a un accès TeamGarantie. Utilisez le bouton "TeamGarantie".');
+    document.getElementById('auth-email').focus(); return;
+  }
   if (!pwd)   { showAuthError('Saisissez votre mot de passe.'); document.getElementById('auth-pwd').focus(); return; }
   if (err) err.style.display = 'none';
 
@@ -1049,6 +1078,54 @@ function deconnecterUsager() {
 }
 
 // Initialiser Firebase dès le chargement (pour auth disponible au clic)
+function showLoginTeam() {
+  document.getElementById('lp-step1').style.display = 'none';
+  document.getElementById('lp-step3').style.display = 'block';
+  setTimeout(function(){ var e=document.getElementById('team-email'); if(e) e.focus(); }, 100);
+}
+
+function connecterTeam() {
+  var email = (document.getElementById('team-email').value || '').trim();
+  var pwd   =  document.getElementById('team-pwd').value   || '';
+  var err   =  document.getElementById('team-error');
+  var btn   =  document.querySelector('#lp-step3 button[onclick="connecterTeam()"]');
+
+  if (!email) { if(err){err.textContent='Saisissez votre e-mail.';err.style.display='block';} return; }
+  if (!pwd)   { if(err){err.textContent='Saisissez votre mot de passe.';err.style.display='block';} return; }
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
+
+  if (!firebase.apps || !firebase.apps.length) {
+    if (typeof initFirebase === 'function') initFirebase();
+  }
+
+  firebase.auth().signInWithEmailAndPassword(email, pwd)
+    .then(function(cred) {
+      // Vérifier que c'est bien un compte TeamGarantie
+      var mail = cred.user.email || '';
+      // Vérifier la liste blanche TeamGarantie
+      if (typeof isTeamEmail !== 'function' || !isTeamEmail(mail)) {
+        firebase.auth().signOut();
+        if(err){err.textContent='Accès TeamGarantie non autorisé pour ce compte.';err.style.display='block';}
+        if(btn){btn.disabled=false;btn.textContent='Se connecter';}
+        return;
+      }
+      G.role = 'team';
+      G.site = '';
+      if(btn){btn.disabled=false;btn.textContent='Se connecter';}
+      ouvrirApp();
+    })
+    .catch(function(e) {
+      var msg = 'E-mail ou mot de passe incorrect.';
+      if (e.code==='auth/user-not-found')     msg = 'Compte introuvable.';
+      if (e.code==='auth/wrong-password')     msg = 'Mot de passe incorrect.';
+      if (e.code==='auth/invalid-credential') msg = 'E-mail ou mot de passe incorrect.';
+      if (e.code==='auth/too-many-requests')  msg = 'Trop de tentatives. Réessayez plus tard.';
+      if(err){err.textContent=msg;err.style.display='block';}
+      if(btn){btn.disabled=false;btn.textContent='Se connecter';}
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof initFirebase === 'function') initFirebase();
 });
