@@ -14,8 +14,7 @@ var TEAM_EMAILS = [
   'tahir.arifi@geauto.fr',
   'nicolas.pfeiffer@geauto.fr',
   'celine.romburg@geauto.fr',
-  'marion.binaux@geauto.fr'
-
+  'marion.binaux@geauto.fr',
   // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
 ];
 
@@ -373,10 +372,17 @@ function ouvrirApp() {
     ge('h-role').textContent = '👤 ' + G.site;
     ge('site-bar').style.display = 'none';
     ge('h-site-name').textContent = G.site;
-    ge('f-site').value = G.site;
-    ge('site-display').value = G.site;
-    renderKulanzForm(G.site);
+    // Remplir les champs site dans le formulaire
+    var fs = ge('f-site'); if (fs) { fs.value = G.site; fs.readOnly = true; }
+    var sd = ge('site-display'); if (sd) { sd.value = G.site; sd.readOnly = true; }
     ge('site-field').style.display = 'flex';
+    // KVPS
+    var kv = ge('kvps'); if (kv) { kv.value = KVPS_MAP[G.site] || ''; kv.readOnly = true; }
+    var kvn = document.querySelector('[name="kvps"]'); if (kvn) { kvn.value = KVPS_MAP[G.site] || ''; kvn.readOnly = true; }
+    renderKulanzForm(G.site);
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
+      b.classList.toggle('active', b.textContent.trim() === G.site);
+    });
     var kvpsEl = ge('kvps');
     if (kvpsEl) { kvpsEl.value = KVPS_MAP[G.site] || ''; kvpsEl.readOnly = true; }
     // Aussi remplir via le champ name= (compatibilité)
