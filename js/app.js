@@ -10,8 +10,8 @@ var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
 // ═══════════════════════════════════════════════════
 var TEAM_EMAILS = [
   'omar.ruiz@geauto.fr',
-  'tahir.arifi@geauto.fr',
   'teamgarantie@geauto.fr',
+  'tahir.arifi@geauto.fr',
   'nicolas.pfeiffer@geauto.fr',
   'celine.romburg@geauto.fr',
   'marion.binaux@geauto.fr'
@@ -358,9 +358,16 @@ function ouvrirApp() {
 
   if (G.role === 'team') {
     ge('h-role').textContent = '🔐 TeamGarantie';
-    ge('site-bar').style.display = 'none';
+    // TeamGarantie: accès total — formulaire + historique + tous les sites
+    ge('site-bar').style.display = 'block'; // Visible pour choisir le site
     ge('dash-wrap').classList.add('on');
     ge('h-site-name').textContent = 'Tous les sites';
+    // Permettre la sélection de site dans le formulaire
+    var fsite = ge('f-site');
+    if (fsite) { fsite.disabled = false; fsite.readOnly = false; }
+    var fsdisplay = ge('site-display');
+    if (fsdisplay) { fsdisplay.disabled = false; fsdisplay.readOnly = false; }
+    ge('site-field').style.display = 'flex';
     renderKulanzForm('VW Bischheim'); // défaut VW pour TeamGarantie
   } else {
     ge('h-role').textContent = '👤 ' + G.site;
