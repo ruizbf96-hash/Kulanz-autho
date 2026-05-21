@@ -355,6 +355,7 @@ tr:hover td{background:rgba(184,151,58,.03)}
 // Anti-flash: exécuté AVANT le rendu
 (function(){
   var s=document.createElement('style');
+  s.setAttribute('data-antiflash','1');
   s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+
     '#login-page{display:flex!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;background:#0f1923!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
   document.head.appendChild(s);
@@ -1115,12 +1116,14 @@ function connecterTeam() {
       if(btn){btn.disabled=false;btn.textContent='Se connecter';}
       ouvrirApp();
     })
-    .catch(function(e) {
+            .catch(function(e) {
       var msg = 'E-mail ou mot de passe incorrect.';
       if (e.code==='auth/user-not-found')     msg = 'Compte introuvable.';
       if (e.code==='auth/wrong-password')     msg = 'Mot de passe incorrect.';
       if (e.code==='auth/invalid-credential') msg = 'E-mail ou mot de passe incorrect.';
+      if (e.code==='auth/invalid-email')      msg = 'Format e-mail invalide.';
       if (e.code==='auth/too-many-requests')  msg = 'Trop de tentatives. Réessayez plus tard.';
+      if (e.code==='auth/network-request-failed') msg = 'Erreur réseau.';
       if(err){err.textContent=msg;err.style.display='block';}
       if(btn){btn.disabled=false;btn.textContent='Se connecter';}
     });
