@@ -10,10 +10,12 @@ var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
 // ═══════════════════════════════════════════════════
 var TEAM_EMAILS = [
   'omar.ruiz@geauto.fr',
+  'tahir.arifi@geauto.fr',
   'teamgarantie@geauto.fr',
   'nicolas.pfeiffer@geauto.fr',
   'celine.romburg@geauto.fr',
   'marion.binaux@geauto.fr'
+
   // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
 ];
 
@@ -379,10 +381,13 @@ function ouvrirApp() {
   }
 
   enableAllDropdowns();
-  // Remettre les pages visibles (anti-flash les avait cachées)
-  var pf = ge('page-form'); if (pf) pf.style.removeProperty('display');
-  var ph = ge('page-histo'); if (ph) ph.style.removeProperty('display');
-  var so = ge('sp-overlay'); if (so) so.style.removeProperty('display');
+  // Retirer la feuille anti-flash et remettre les pages visibles
+  var afStyle = document.querySelector('style[data-antiflash]');
+  if (afStyle) afStyle.remove();
+  // Forcer display sur les éléments principaux
+  var pf = ge('page-form');  if (pf) { pf.style.cssText = ''; }
+  var ph = ge('page-histo'); if (ph) { ph.style.cssText = ''; }
+  var so = ge('sp-overlay'); if (so) { so.style.cssText = ''; }
   initFirebase();
   startListener();
   restoreDraft();
@@ -393,6 +398,13 @@ function deconnecter() {
   G.role = ''; G.site = ''; G.fbListening = false;
   var mh2 = ge('main-header') || document.querySelector('header');
   if (mh2) mh2.style.display = 'none';
+  // Recréer l'anti-flash pour la prochaine connexion
+  if (!document.querySelector('style[data-antiflash]')) {
+    var s=document.createElement('style');
+    s.setAttribute('data-antiflash','1');
+    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;background:#0f1923!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
+    document.head.appendChild(s);
+  }
   ge('login-page').classList.remove('hidden');
   ge('lp-step1').style.display = 'block';
   ge('lp-step2').style.display = 'none';
