@@ -9,7 +9,7 @@ var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
 // Ajoutez ici les emails qui ont accès TeamGarantie
 // ═══════════════════════════════════════════════════
 var TEAM_EMAILS = [
-  'omar.ruiz@geauto.fr', 'tahir.arifi@geauto.fr','nicolas.pfeiffer@geauto.fr','celine.romburg@geauto.fr',
+  'omar.ruiz@geauto.fr', 'tahir.arifi@geauto.fr','nicolas.pfeiffer@geauto.fr','celine.romburg@geauto.fr','marion.binaux@geauto.fr','teamgarantie@geauto.fr',
   // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
 ];
 
