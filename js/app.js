@@ -1733,7 +1733,7 @@ function validerSP() {
 }
 
 function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Validée':'✅','Refusée':'❌','Complément requis':'🔄','En attente':'🟡'};
+  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
   var ic = icons[statut] || '🔔';
   var sep = Array(41).join('-');
   var pecMsg = '';
@@ -1753,8 +1753,8 @@ function sendStatusMail(d, statut, commentaire, commerce) {
     +'\nChassis : '+d.chassis
     +(commentaire?'\nCommentaire : '+commentaire:'')
     +pecMsg+'\n'+sep+'\n\n'
-    +(statut==='Validée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
-     :statut==='Refusée'?'Veuillez contacter la TeamGarantie.\n'
+    +(statut==='Traitée'?'Vous pouvez proceder à la réparation.\n'
+     :statut==='Traitée sans participation'?'Une participation CCR est envisageable.\n'
      :'Un complement de dossier est necessaire.\n')
     +'\nCordialement,\nTeam Garantie GEA - VW';
   fetch('https://api.web3forms.com/submit', {
