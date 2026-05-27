@@ -11,10 +11,6 @@ var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
 var TEAM_EMAILS = [
   'omar.ruiz@geauto.fr',
   'teamgarantie@geauto.fr',
-  'tahir.arifi@geauto.fr',
-  'nicolas.pfeiffer@geauto.fr',
-  'celine.romburg@geauto.fr',
-  'marion.binaux@geauto.fr',
   // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
 ];
 
@@ -1312,7 +1308,13 @@ function envoyerFormulaire() {
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
       statut: 'En attente', commentaire_team: '', commerce: null
     };
+    if (demandesRef) {
     if (demandesRef) return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
+    return _pjK2.then(function(_u2){if(_u2.length)newD2.pieces_jointes=_u2;
+      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
+    }).catch(function(e){console.warn('PJ Kulanz:',e);
+      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
+    });}
     G.demandes.unshift(newD2); return newD2;
   })
   .then(function(newD2){
@@ -1439,7 +1441,7 @@ function renderHisto() {
   var el = function(id,val) { var e=ge(id); if(e) e.textContent=val; };
   el('s-total', scope.length);
   el('s-wait',  scope.filter(function(d){return d.statut==='En attente';}).length);
-  el('s-ok',    scope.filter(function(d){return d.statut==='Validée';}).length);
+  el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
   el('s-no',    scope.filter(function(d){return d.statut==='Refusée';}).length);
 
   var filtered = G.demandes.filter(function(d) {
@@ -1462,7 +1464,7 @@ function renderHisto() {
     var bc   = BADGE[d.statut] || 'b-wait';
     var ic   = ICON[d.statut]  || '🟡';
     var pec  = '—';
-    if (d.statut==='Validée' && d.commerce) {
+    if (d.statut==='Traitée' && d.commerce) {
       var c=d.commerce, pts=[];
       if(c.mo_de)  pts.push('<span>MO: '+esc(c.mo_de)+'%</span>');
       if(c.pi_de)  pts.push('<span>Pièces: '+esc(c.pi_de)+'%</span>');
@@ -1570,7 +1572,7 @@ function renderDash() {
     var sd    = G.demandes.filter(function(d) { return d.site===site; });
     var total = sd.length;
     var wait  = sd.filter(function(d) { return d.statut==='En attente'; }).length;
-    var valid = sd.filter(function(d) { return d.statut==='Validée'; }).length;
+    var valid = sd.filter(function(d) { return d.statut==='Traitée'; }).length;
     totalWait += wait;
     var cls = 'd-card' + (wait>0?' pending':'') + (curFilter===site?' sel':'');
     // Utiliser data-site pour éviter les problèmes de quotes
@@ -1632,6 +1634,7 @@ function openSP(id) {
   var d = G.demandes.find(function(x) { return x.id == id; });
   if (!d) return;
   var setText = function(elId, val) { var e=ge(elId); if(e) e.textContent=val||'—'; };
+  setText('sp-sub',d.type+' — OR '+d.or+' — '+d.date);
   setText('sp-sub',     d.type+' — OR '+d.or+' — '+d.date);
   setText('sp-site',    d.site);
   setText('sp-type',    d.type);
@@ -1702,7 +1705,7 @@ function validerSP() {
   var update = {
     statut: statut,
     commentaire_team: commentaire,
-    commerce: statut==='Validée' ? commerce : (d.commerce||null)
+    commerce: statut==='Traitée' ? commerce : (d.commerce||null)
   };
 
   var doSave = function() {
@@ -1720,9 +1723,9 @@ function validerSP() {
     .then(function() {
       closeSP(); renderHisto(); renderDash();
       toast('✔ Statut mis à jour : '+statut);
-      // E-mail seulement si pas "En attente"
-      if (d.email_usager && statut !== 'En attente') {
-        sendStatusMail(d, statut, commentaire, commerce);
+      // Envoi mail + PDF Kulanz si statut final
+      if (statut !== 'En attente') {
+        envoyerMailKulanz(d, statut, commentaire, commerce);
       }
     })
     .catch(function(err) {
@@ -1732,12 +1735,112 @@ function validerSP() {
     });
 }
 
+
+// ═══════════════════════════════════════════════════════
+// ENVOI MAIL KULANZ — avec PDF + sujet structuré
+// ═══════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+
+// Upload vers Firebase Storage et retourner les URLs
+function envoyerMailKulanz(d, statut, commentaire, commerce) {
+  if (!d) return;
+
+  // Sujet : Demande Kulanz_VIN_KVPS
+  var kvps = d.kvps || KVPS_MAP[d.site] || '';
+  var sujet = 'Demande Kulanz_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
+
+  // Corps du mail
+  var corps = 'DEMANDE KULANZ - ' + (d.site || '') + '\n';
+  corps += 'Statut : ' + statut + '\n';
+  corps += 'Chassis : ' + (d.chassis || '') + '  |  N OR : ' + (d.or_number || '') + '\n';
+  corps += 'Technicien : ' + (d.technicien || '') + '\n';
+  if (commentaire) corps += '\nCommentaire TeamGarantie :\n' + commentaire + '\n';
+  if (statut === 'Traitée' && commerce) {
+    corps += '\nParticipation commerciale :\n';
+    if (commerce.mo_de)  corps += '  MO : ' + commerce.mo_de + '%\n';
+    if (commerce.pi_de)  corps += '  Pièces : ' + commerce.pi_de + '%\n';
+    if (commerce.moe_de) corps += '  MO Ext : ' + commerce.moe_de + '%\n';
+    if (commerce.pe_de)  corps += '  Pièces Ext : ' + commerce.pe_de + '%\n';
+  }
+  corps += '\nCordialement,\nTeam Garantie GEA – VW';
+
+  // Générer le PDF Kulanz
+  try {
+    if (typeof genererPDFKulanz === 'function') {
+      genererPDFKulanz(d, statut, commentaire);
+    }
+  } catch(e) { console.warn('PDF Kulanz:', e); }
+
+  // Ouvrir Outlook avec l'email pré-rempli
+  var dest = d.email_usager || d.email || '';
+  if (!dest) dest = 'teamgarantie@geauto.fr';
+  var corpsEnc = encodeURIComponent(corps.substring(0, 1500));
+  var sujetEnc = encodeURIComponent(sujet);
+  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
+
+  var a = document.createElement('a');
+  a.href = mailto;
+  a.click();
+
+  toast('✔ Mail préparé dans Outlook');
+}
+
+// Générer PDF récapitulatif Kulanz pour TeamGarantie
+function genererPDFKulanz(d, statut, commentaire) {
+  if (typeof window.jspdf === 'undefined' && typeof jsPDF === 'undefined') return;
+  var jsPDFc = (typeof jsPDF !== 'undefined') ? jsPDF : window.jspdf.jsPDF;
+  var doc = new jsPDFc({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var y = 20;
+  var gold = [184, 148, 75];
+
+  doc.setFillColor(15, 25, 35);
+  doc.rect(0, 0, 210, 40, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text('TEAM GARANTIE GEA - VW', 105, 18, { align: 'center' });
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+  doc.setTextColor(gold[0], gold[1], gold[2]);
+  doc.text('RÉCAPITULATIF DEMANDE KULANZ — ' + statut.toUpperCase(), 105, 28, { align: 'center' });
+  y = 50;
+
+  doc.setTextColor(15, 25, 35);
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+  doc.text('Site : ' + (d.site || ''), 15, y); y += 6;
+  doc.text('Châssis : ' + (d.chassis || ''), 15, y); y += 6;
+  doc.text('N° OR : ' + (d.or_number || '') + '   Date : ' + (d.date_or || ''), 15, y); y += 6;
+  doc.text('Technicien : ' + (d.technicien || ''), 15, y); y += 6;
+  doc.text('KVPS : ' + (d.kvps || KVPS_MAP[d.site] || ''), 15, y); y += 10;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Statut : ' + statut, 15, y); y += 8;
+
+  if (d.plainte_client) {
+    doc.setFont('helvetica', 'bold'); doc.text('Plainte client :', 15, y); y += 5;
+    doc.setFont('helvetica', 'normal');
+    var lines = doc.splitTextToSize(d.plainte_client, 180);
+    doc.text(lines, 15, y); y += lines.length * 5 + 4;
+  }
+
+  if (commentaire) {
+    doc.setFont('helvetica', 'bold'); doc.text('Commentaire TeamGarantie :', 15, y); y += 5;
+    doc.setFont('helvetica', 'normal');
+    var clines = doc.splitTextToSize(commentaire, 180);
+    doc.text(clines, 15, y); y += clines.length * 5 + 4;
+  }
+
+  var kvps = d.kvps || KVPS_MAP[d.site] || '';
+  var filename = 'Kulanz_' + (d.chassis || 'demande') + (kvps ? '_' + kvps : '') + '.pdf';
+  doc.save(filename);
+}
+
 function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
+  var icons = {'Validée':'✅','Refusée':'❌','Complément requis':'🔄','En attente':'🟡'};
   var ic = icons[statut] || '🔔';
   var sep = Array(41).join('-');
   var pecMsg = '';
-  if (statut==='Validée' && commerce) {
+  if (statut==='Traitée' && commerce) {
     pecMsg = '\n\nPrise en charge accordée :\n';
     if(commerce.mo_de)  pecMsg += '- Main d oeuvre : '+commerce.mo_de+'%\n';
     if(commerce.pi_de)  pecMsg += '- Pieces        : '+commerce.pi_de+'%\n';
@@ -1753,8 +1856,8 @@ function sendStatusMail(d, statut, commentaire, commerce) {
     +'\nChassis : '+d.chassis
     +(commentaire?'\nCommentaire : '+commentaire:'')
     +pecMsg+'\n'+sep+'\n\n'
-    +(statut==='Traitée'?'Vous pouvez proceder à la réparation.\n'
-     :statut==='Traitée sans participation'?'Une participation CCR est envisageable.\n'
+    +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
+     :statut==='Refusée'?'Veuillez contacter la TeamGarantie.\n'
      :'Un complement de dossier est necessaire.\n')
     +'\nCordialement,\nTeam Garantie GEA - VW';
   fetch('https://api.web3forms.com/submit', {
@@ -2299,3 +2402,4 @@ function checkKulanzNok() {
     initFirebase(); // Firebase initialisé dès le chargement
   }
 })();
+
