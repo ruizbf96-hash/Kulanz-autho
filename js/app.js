@@ -1183,7 +1183,7 @@ function envoyerFormulaire() {
     // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
     var corps = 'DEMANDE CCR - ' + site + '\n';
     corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
-    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
+    corps += 'Technicien: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
     corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
     corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
     corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
@@ -1216,10 +1216,10 @@ function envoyerFormulaire() {
       _a.href = mailto;
       _a.style.display = 'none';
       document.body.appendChild(_a);
-      // Ouvrir sans envoi automatique
-      window.location.href = mailto;
+      _a.click();
       setTimeout(function(){ document.body.removeChild(_a); }, 500);
     } catch(e) {
+      // Fallback si createElement échoue
       window.location.href = mailto;
     }
     var newD = {
@@ -1758,7 +1758,7 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
 
   // Corps du mail
   var sep  = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-  var sep2 = '────────────────────────────────────────────────────';
+  var sep2 = '─────────────────────────────────────────────────────';
   var statIcon = statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
   var corps = sep + '\n';
   corps += '🔧  DEMANDE KULANZ — ' + (d.site||'').toUpperCase() + '\n';
@@ -1798,11 +1798,14 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var sujetEnc = encodeURIComponent(sujet);
   var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
 
-  // Ouvrir Outlook sans envoi automatique
-  window.location.href = mailto;
+  var a = document.createElement('a');
+  a.href = mailto;
+  a.click();
 
-  toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
+  toast('✔ Mail préparé dans Outlook');
 }
+
+// Générer PDF récapitulatif Kulanz pour TeamGarantie
 
 
 function sendStatusMail(d, statut, commentaire, commerce) {
