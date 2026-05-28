@@ -1674,7 +1674,7 @@ function closeSP() {
 function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
-  if (s && c) c.style.display = s.value==='Validée' ? 'block' : 'none';
+  if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
 }
 
 function validerSP() {
