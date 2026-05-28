@@ -1216,10 +1216,10 @@ function envoyerFormulaire() {
       _a.href = mailto;
       _a.style.display = 'none';
       document.body.appendChild(_a);
-      _a.click();
+      // Ouvrir sans envoi automatique
+      window.location.href = mailto;
       setTimeout(function(){ document.body.removeChild(_a); }, 500);
     } catch(e) {
-      // Fallback si createElement échoue
       window.location.href = mailto;
     }
     var newD = {
@@ -1798,11 +1798,10 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var sujetEnc = encodeURIComponent(sujet);
   var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
 
-  var a = document.createElement('a');
-  a.href = mailto;
-  a.click();
+  // Ouvrir Outlook sans envoi automatique
+  window.location.href = mailto;
 
-  toast('✔ Mail préparé dans Outlook');
+  toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
 }
 
 
