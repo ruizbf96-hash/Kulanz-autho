@@ -1442,7 +1442,7 @@ function renderHisto() {
   el('s-total', scope.length);
   el('s-wait',  scope.filter(function(d){return d.statut==='En attente';}).length);
   el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
-  el('s-no',    scope.filter(function(d){return d.statut==='Refusée';}).length);
+  el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
   var filtered = G.demandes.filter(function(d) {
     return (!fS||d.site===fS) && (!fT||d.type===fT) && (!fSt||d.statut===fSt);
@@ -1456,9 +1456,9 @@ function renderHisto() {
   if (empty) empty.style.display='none';
 
   var BADGE = {
-    'En attente':'b-wait','Validée':'b-ok','Refusée':'b-no','Complément requis':'b-comp'
+    'En attente':'b-wait','Traitée':'b-ok','Traitée sans participation':'b-no','Complément requis':'b-comp'
   };
-  var ICON = {'En attente':'🟡','Validée':'✅','Refusée':'❌','Complément requis':'🔄'};
+  var ICON = {'En attente':'🟡','Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄'};
 
   tbody.innerHTML = filtered.map(function(d) {
     var bc   = BADGE[d.statut] || 'b-wait';
@@ -1837,7 +1837,7 @@ function genererPDFKulanz(d, statut, commentaire) {
 }
 
 function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Validée':'✅','Refusée':'❌','Complément requis':'🔄','En attente':'🟡'};
+  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
   var ic = icons[statut] || '🔔';
   var sep = Array(41).join('-');
   var pecMsg = '';
@@ -1858,7 +1858,7 @@ function sendStatusMail(d, statut, commentaire, commerce) {
     +(commentaire?'\nCommentaire : '+commentaire:'')
     +pecMsg+'\n'+sep+'\n\n'
     +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
-     :statut==='Refusée'?'Veuillez contacter la TeamGarantie.\n'
+     :statut==='Traitée sans participation'?'Veuillez contacter la TeamGarantie.\n'
      :'Un complement de dossier est necessaire.\n')
     +'\nCordialement,\nTeam Garantie GEA - VW';
   fetch('https://api.web3forms.com/submit', {
@@ -2403,4 +2403,3 @@ function checkKulanzNok() {
     initFirebase(); // Firebase initialisé dès le chargement
   }
 })();
-
