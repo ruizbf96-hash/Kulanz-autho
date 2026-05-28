@@ -1680,10 +1680,11 @@ function onStatutChange() {
 function validerSP() {
   var okBtn = ge('sp-ok-btn');
   if (okBtn && okBtn.disabled) return;
-  var pwd = ge('sp-pwd').value;
-  if (pwd !== MOT_DE_PASSE) {
+  // Vérifier que l'utilisateur est connecté via Firebase Auth comme TeamGarantie
+  var currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!currentUser || !isTeamEmail(currentUser.email)) {
+    ge('sp-pwd-err').textContent = 'Session expirée. Reconnectez-vous.';
     ge('sp-pwd-err').style.display = 'block';
-    ge('sp-pwd').focus();
     return;
   }
   ge('sp-pwd-err').style.display = 'none';
