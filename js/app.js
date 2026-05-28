@@ -877,7 +877,7 @@ function acPick(el) {
   ge('chassis').className = 'ok';
   if (d.kilometrage) sv('kilometrage', d.kilometrage);
   if (d.date_or)     sv('date_or', d.date_or);
-  if (d.technicien)  sv('technicien', d.technicien);
+  if (d.conseiller_client)  sv('conseiller_client', d.conseiller_client);
   if (d.email_usager) sv('email_usager', d.email_usager);
   if (d.kvps && !ge('kvps').readOnly) sv('kvps', d.kvps);
   if (d.site && G.role === 'team') {
@@ -904,7 +904,7 @@ function saveKulanz() {
     site:        ge('f-site') ? ge('f-site').value : '',
     chassis:     gv('chassis'),      kilometrage: gv('kilometrage'),
     or_number:   gv('or_number'),    date_or:     gv('date_or'),
-    kvps:        gv('kvps'),         technicien:  gv('technicien'),
+    kvps:        gv('kvps'),         conseiller_client:  gv('conseiller_client'),
     email_usager:gv('email_usager'), plainte_client:gv('plainte_client'),
     emplacement: gv('emplacement'),  ref_piece:   gv('ref_piece'),
     dom_cat:     ge('dom-cat')  ? ge('dom-cat').value  : '',
@@ -924,7 +924,7 @@ function copyKulanz() {
     alert('⚠ Aucune donnée Kulanz à copier. Remplissez d’abord le formulaire.');
     return;
   }
-  ['chassis','kilometrage','or_number','date_or','kvps','technicien','email_usager',
+  ['chassis','kilometrage','or_number','date_or','kvps','conseiller_client','email_usager',
    'plainte_client','emplacement','ref_piece'].forEach(function(n) { if(k[n]) sv(n,k[n]); });
   if (k.site) {
     ge('f-site').value = k.site;
@@ -978,7 +978,7 @@ function saveDraft() {
       site: ge('f-site').value, type: ge('f-type').value,
       chassis: gv('chassis'), kilometrage: gv('kilometrage'),
       or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
-      technicien: gv('technicien'), email_usager: gv('email_usager'),
+      conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
       plainte_client: gv('plainte_client'),
       emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
       desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
@@ -1024,7 +1024,7 @@ function restoreDraft() {
       ge('h-site-name').textContent = b.site;
       [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
     }
-    ['chassis','kilometrage','or_number','kvps','technicien','email_usager',
+    ['chassis','kilometrage','or_number','kvps','conseiller_client','email_usager',
      'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
       if (b[n]) sv(n, b[n]);
     });
@@ -1107,7 +1107,7 @@ function collectData() {
     { l:'N° OR',            v:gv('or_number') },
     { l:'Date OR',          v:gv('date_or') },
     { l:'KVPS',             v:gv('kvps') },
-    { l:'Nom du demandeur', v:gv('technicien') },
+    { l:'Nom du demandeur', v:gv('conseiller_client') },
     { l:'E-mail',           v:gv('email_usager') },
     { l:'Châssis',          v:gv('chassis') },
     { l:'Kilométrage',      v:gv('kilometrage') ? gv('kilometrage')+' km' : '' },
@@ -1156,7 +1156,7 @@ function envoyerFormulaire() {
   if (!ge('desig-val') || !ge('desig-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner une d\u00e9signation pi\u00e8ce.'); return; }
   if (!ge('dom-val') || !ge('dom-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code dommage.'); return; }
   if (!ge('ava-val') || !ge('ava-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code avarie.'); return; }
-  if (!gv('technicien')) { alert('\u26a0 Le nom du demandeur est obligatoire.'); return; }
+  if (!gv('conseiller_client')) { alert('\u26a0 Le nom du demandeur est obligatoire.'); return; }
   var email = gv('email_usager');
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { alert('\u26a0 E-mail invalide.'); return; }
   if (isCCR) {
@@ -1183,7 +1183,7 @@ function envoyerFormulaire() {
     // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
     var corps = 'DEMANDE CCR - ' + site + '\n';
     corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
-    corps += 'Technicien: ' + gv('technicien') + '  |  Email: ' + gv('email_usager') + '\n';
+    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
     corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
     corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
     corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
@@ -1200,7 +1200,7 @@ function envoyerFormulaire() {
     corps += '3. Envoyer depuis Outlook\n';
     corps += '\nTeam Garantie GEA - VW';
     var kvps2   = gv('kvps') || site;
-    var subject = 'Demande CCR - ' + kvps2 + ' - ' + site + ' - ' + gv('chassis') + ' - ' + gv('technicien');
+    var subject = 'Demande CCR - ' + kvps2 + ' - ' + site + ' - ' + gv('chassis') + ' - ' + gv('conseiller_client');
     window._lastSubject = subject; // Stocké pour copierObjetMail()
     // Limiter a 1000 chars pour garantir compatibilite tous clients mail
     var corpsLimite = corps.length > 1000
@@ -1230,7 +1230,7 @@ function envoyerFormulaire() {
       desig_piece: ge('desig-val')?ge('desig-val').value:'',
       rubrique: ge('rub-val')?ge('rub-val').value:'',
       categorie: ge('dom-cat')?ge('dom-cat').value:'',
-      email_usager: email, technicien: gv('technicien'),
+      email_usager: email, conseiller_client: gv('conseiller_client'),
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
       statut: 'En attente', commentaire_team: '', commerce: null
     };
@@ -1294,7 +1294,7 @@ function envoyerFormulaire() {
     body: JSON.stringify({
       access_key: WEB3_KEY,
       subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
-      message: msg, from_name: gv('technicien')||d.site, replyto: email
+      message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
     })
   })
   .then(function(r){ return r.json(); })
@@ -1308,7 +1308,7 @@ function envoyerFormulaire() {
       desig_piece: ge('desig-val')?ge('desig-val').value:'',
       rubrique: ge('rub-val')?ge('rub-val').value:'',
       categorie: ge('dom-cat')?ge('dom-cat').value:'',
-      email_usager: email, technicien: gv('technicien'),
+      email_usager: email, conseiller_client: gv('conseiller_client'),
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
       statut: 'En attente', commentaire_team: '', commerce: null
     };
@@ -1446,7 +1446,7 @@ function renderHisto() {
   el('s-total', scope.length);
   el('s-wait',  scope.filter(function(d){return d.statut==='En attente';}).length);
   el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
-  el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
+  el('s-no',    scope.filter(function(d){return d.statut==='Refusée';}).length);
 
   var filtered = G.demandes.filter(function(d) {
     return (!fS||d.site===fS) && (!fT||d.type===fT) && (!fSt||d.statut===fSt);
@@ -1460,9 +1460,9 @@ function renderHisto() {
   if (empty) empty.style.display='none';
 
   var BADGE = {
-    'En attente':'b-wait','Traitée':'b-ok','Traitée sans participation':'b-no','Complément requis':'b-comp'
+    'En attente':'b-wait','Validée':'b-ok','Refusée':'b-no','Complément requis':'b-comp'
   };
-  var ICON = {'En attente':'🟡','Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄'};
+  var ICON = {'En attente':'🟡','Validée':'✅','Refusée':'❌','Complément requis':'🔄'};
 
   tbody.innerHTML = filtered.map(function(d) {
     var bc   = BADGE[d.statut] || 'b-wait';
@@ -1757,26 +1757,39 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var sujet = 'Demande Kulanz_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
 
   // Corps du mail
-  var corps = 'DEMANDE KULANZ - ' + (d.site || '') + '\n';
-  corps += 'Statut : ' + statut + '\n';
-  corps += 'Chassis : ' + (d.chassis || '') + '  |  N OR : ' + (d.or_number || '') + '\n';
-  corps += 'Technicien : ' + (d.technicien || '') + '\n';
-  if (commentaire) corps += '\nCommentaire TeamGarantie :\n' + commentaire + '\n';
+  var sep  = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  var sep2 = '────────────────────────────────────────────────────';
+  var statIcon = statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
+  var corps = sep + '\n';
+  corps += '🔧  DEMANDE KULANZ — ' + (d.site||'').toUpperCase() + '\n';
+  corps += sep + '\n\n';
+  corps += '📋  IDENTIFICATION\n' + sep2 + '\n';
+  corps += '  N° OR          : ' + (d.or_number||'—') + '\n';
+  corps += '  Date OR        : ' + (d.date_or||'—') + '\n';
+  corps += '  Châssis        : ' + (d.chassis||'—') + '\n';
+  corps += '  Kilométrage    : ' + (d.kilometrage||'—') + ' km\n';
+  corps += '  KVPS           : ' + (kvps||'—') + '\n';
+  corps += '  Conseiller     : ' + (d.conseiller_client||'—') + '\n';
+  corps += '  E-mail         : ' + (d.email_usager||'—') + '\n\n';
+  corps += '🔩  DOMMAGE\n' + sep2 + '\n';
+  corps += '  Catégorie      : ' + (d.categorie||'—') + '\n';
+  corps += '  Rubrique       : ' + (d.rubrique||'—') + '\n';
+  corps += '  Désignation    : ' + (d.designation||'—') + '\n';
+  corps += '  Code dommage   : ' + (d.code_dom||'—') + '\n';
+  corps += '  Code avarie    : ' + (d.code_ava||'—') + '\n';
+  if (d.plainte_client) corps += '  Plainte client : ' + d.plainte_client + '\n';
+  corps += '\n' + statIcon + '  STATUT : ' + statut.toUpperCase() + '\n' + sep2 + '\n';
+  if (commentaire) corps += '  Commentaire    : ' + commentaire + '\n';
   if (statut === 'Traitée' && commerce) {
-    corps += '\nParticipation commerciale :\n';
-    if (commerce.mo_de)  corps += '  MO : ' + commerce.mo_de + '%\n';
-    if (commerce.pi_de)  corps += '  Pièces : ' + commerce.pi_de + '%\n';
-    if (commerce.moe_de) corps += '  MO Ext : ' + commerce.moe_de + '%\n';
-    if (commerce.pe_de)  corps += '  Pièces Ext : ' + commerce.pe_de + '%\n';
+    corps += '\n💶  PARTICIPATION COMMERCIALE\n' + sep2 + '\n';
+    if (commerce.mo_de)  corps += '  MO             : ' + commerce.mo_de + ' %\n';
+    if (commerce.pi_de)  corps += '  Pièces         : ' + commerce.pi_de + ' %\n';
+    if (commerce.moe_de) corps += '  MO Ext         : ' + commerce.moe_de + ' %\n';
+    if (commerce.pe_de)  corps += '  Pièces Ext     : ' + commerce.pe_de + ' %\n';
   }
-  corps += '\nCordialement,\nTeam Garantie GEA – VW';
-
-  // Générer le PDF Kulanz
-  try {
-    if (typeof genererPDFKulanz === 'function') {
-      genererPDFKulanz(d, statut, commentaire);
-    }
-  } catch(e) { console.warn('PDF Kulanz:', e); }
+  corps += '\n' + sep + '\n';
+  corps += 'Team Garantie GEA – VW  |  Alsace  |  teamgarantie@geauto.fr\n';
+  corps += sep + '\n';
 
   // Ouvrir Outlook avec l'email pré-rempli
   var dest = d.email_usager || d.email || '';
@@ -1792,56 +1805,9 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   toast('✔ Mail préparé dans Outlook');
 }
 
-// Générer PDF récapitulatif Kulanz pour TeamGarantie
-function genererPDFKulanz(d, statut, commentaire) {
-  if (typeof window.jspdf === 'undefined' && typeof jsPDF === 'undefined') return;
-  var jsPDFc = (typeof jsPDF !== 'undefined') ? jsPDF : window.jspdf.jsPDF;
-  var doc = new jsPDFc({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  var y = 20;
-  var gold = [184, 148, 75];
-
-  doc.setFillColor(15, 25, 35);
-  doc.rect(0, 0, 210, 40, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-  doc.text('TEAM GARANTIE GEA - VW', 105, 18, { align: 'center' });
-  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-  doc.setTextColor(gold[0], gold[1], gold[2]);
-  doc.text('RÉCAPITULATIF DEMANDE KULANZ — ' + statut.toUpperCase(), 105, 28, { align: 'center' });
-  y = 50;
-
-  doc.setTextColor(15, 25, 35);
-  doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-  doc.text('Site : ' + (d.site || ''), 15, y); y += 6;
-  doc.text('Châssis : ' + (d.chassis || ''), 15, y); y += 6;
-  doc.text('N° OR : ' + (d.or_number || '') + '   Date : ' + (d.date_or || ''), 15, y); y += 6;
-  doc.text('Technicien : ' + (d.technicien || ''), 15, y); y += 6;
-  doc.text('KVPS : ' + (d.kvps || KVPS_MAP[d.site] || ''), 15, y); y += 10;
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('Statut : ' + statut, 15, y); y += 8;
-
-  if (d.plainte_client) {
-    doc.setFont('helvetica', 'bold'); doc.text('Plainte client :', 15, y); y += 5;
-    doc.setFont('helvetica', 'normal');
-    var lines = doc.splitTextToSize(d.plainte_client, 180);
-    doc.text(lines, 15, y); y += lines.length * 5 + 4;
-  }
-
-  if (commentaire) {
-    doc.setFont('helvetica', 'bold'); doc.text('Commentaire TeamGarantie :', 15, y); y += 5;
-    doc.setFont('helvetica', 'normal');
-    var clines = doc.splitTextToSize(commentaire, 180);
-    doc.text(clines, 15, y); y += clines.length * 5 + 4;
-  }
-
-  var kvps = d.kvps || KVPS_MAP[d.site] || '';
-  var filename = 'Kulanz_' + (d.chassis || 'demande') + (kvps ? '_' + kvps : '') + '.pdf';
-  doc.save(filename);
-}
 
 function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
+  var icons = {'Validée':'✅','Refusée':'❌','Complément requis':'🔄','En attente':'🟡'};
   var ic = icons[statut] || '🔔';
   var sep = Array(41).join('-');
   var pecMsg = '';
@@ -1853,7 +1819,7 @@ function sendStatusMail(d, statut, commentaire, commerce) {
     if(commerce.pe_de)  pecMsg += '- Pieces ext.   : '+commerce.pe_de+'%\n';
     if(commerce.type_ext) pecMsg += '- Type ext.     : '+commerce.type_ext+'\n';
   }
-  var body = 'Bonjour'+(d.technicien?' '+d.technicien:'')+',\n\n'
+  var body = 'Bonjour'+(d.conseiller_client?' '+d.conseiller_client:'')+',\n\n'
     +'Votre demande '+d.type+' a ete traitee.\n\n'
     +sep+'\nStatut : '+ic+' '+statut
     +'\nSite : '+d.site
@@ -1862,7 +1828,7 @@ function sendStatusMail(d, statut, commentaire, commerce) {
     +(commentaire?'\nCommentaire : '+commentaire:'')
     +pecMsg+'\n'+sep+'\n\n'
     +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
-     :statut==='Traitée sans participation'?'Veuillez contacter la TeamGarantie.\n'
+     :statut==='Refusée'?'Veuillez contacter la TeamGarantie.\n'
      :'Un complement de dossier est necessaire.\n')
     +'\nCordialement,\nTeam Garantie GEA - VW';
   fetch('https://api.web3forms.com/submit', {
