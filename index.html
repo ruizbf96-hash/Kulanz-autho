@@ -964,12 +964,7 @@ tr:hover td{background:rgba(184,151,58,.03)}
       </div>
     </div>
     <div class="sp-sec">
-      <div class="sp-sec-title">Authentification</div>
-      <div class="field">
-        <label>Mot de passe TeamGarantie <span class="req">*</span></label>
-        <input type="password" id="sp-pwd" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')validerSP()">
-        <div class="sp-pwd-err" id="sp-pwd-err">Mot de passe incorrect.</div>
-      </div>
+      <div id="sp-pwd-err" class="sp-pwd-err" style="display:none">Session expirée. Reconnectez-vous.</div>
     </div>
   </div>
   <div class="sp-footer">
