@@ -1,282 +1,2375 @@
+'use strict';
 
-/* ── VARIABLES ── */
-:root{
-  --bg:#F4F6F9;
-  --card:#ffffff;
-  --dark:#0D2D4A;
-  --dark2:#1A3D5C;
-  --accent:#0099AA;
-  --accent2:#007A8A;
-  --gold:#0099AA;
-  --gold2:#4DC9A8;
-  --silver:#6B7A8D;
-  --red:#C0392B;
-  --green:#0B7A6E;
-  --orange:#E67E22;
-  --info:#1A6BB5;
-  --shadow:0 1px 6px rgba(13,45,74,0.08);
-  --shadow-md:0 4px 16px rgba(13,45,74,0.1);
-  --r:9px;
-  --font-body:'DM Sans','Segoe UI',system-ui,sans-serif;
-  --font-title:'DM Sans','Segoe UI',system-ui,sans-serif;
+var SITES     = ['Audi Hœnheim','Audi Obernai','SEAT Hœnheim','SEAT Illkirch','SKODA Hœnheim','SKODA Obernai','VW Bischheim','VW Illkirch','VW Obernai'];
+var KVPS_MAP  = {'Audi Hœnheim':'02155','Audi Obernai':'02486','SEAT Hœnheim':'63930','SEAT Illkirch':'02153','SKODA Hœnheim':'02376','SKODA Obernai':'02485','VW Bischheim':'02154','VW Illkirch':'02153','VW Obernai':'02485'};
+var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
+
+// ═══════════════════════════════════════════════════
+// LISTE BLANCHE TeamGarantie
+// Ajoutez ici les emails qui ont accès TeamGarantie
+// ═══════════════════════════════════════════════════
+var TEAM_EMAILS = [
+  'omar.ruiz@geauto.fr',
+  'teamgarantie@geauto.fr',
+  'tahir.arifi@geauto.fr',
+  'nicolas.pfeiffer@geauto.fr',
+  'celine.romburg@geauto.fr',
+  'marion.binaux@geauto.fr',
+  // 'prenom.nom@geauto.fr',  // ← ajoutez d'autres membres ici
+];
+
+function isTeamEmail(email) {
+  if (!email) return false;
+  var e = email.toLowerCase().trim();
+  for (var i = 0; i < TEAM_EMAILS.length; i++) {
+    if (TEAM_EMAILS[i].toLowerCase() === e) return true;
+  }
+  return false;
+}
+var WEB3_KEY     = '7bf5b927-e39f-4fc1-9f60-642e4741e445';
+
+// ═══════════════════════════════════════════════════════════
+// VÉRIFICATIONS KULANZ PAR MARQUE
+// ═══════════════════════════════════════════════════════════
+var SITE_BRAND = {
+  'Audi Hœnheim': 'Audi',
+  'Audi Obernai':      'Audi',
+  'SEAT Hœnheim': 'SEAT',
+  'SEAT Illkirch':     'SEAT',
+  'SKODA Hœnheim':'SKODA',
+  'SKODA Obernai':     'SKODA',
+  'VW Bischheim':      'VW',
+  'VW Illkirch':       'VW',
+  'VW Obernai':        'VW'
+};
+
+var KULANZ_BY_BRAND = {
+  'VW': [
+    {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
+    {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
+    {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
+    {name:'preconisations',  label:"Les préconisations constructeur pour les entretiens sont toutes respectées ?", nok:'NON', info:"Préconisations non respectées"},
+    {name:'dernier_entretien',label:"Le dernier entretien est-il présent ?",                     nok:'NON', info:"Dernier entretien manquant"},
+    {name:'vendu_client',    label:"Si non, est-il vendu au client et réalisé en même temps que la réparation ?", nok:null},
+    {name:'lien_entretien',  label:"Un lien peut être établi entre la cause du dommage et l'entretien ?", nok:'OUI', info:"Lien dommage/entretien détecté"}
+  ],
+  'Audi': [
+    {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
+    {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
+    {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
+    {name:'preconisations',  label:"Les préconisations constructeur pour les entretiens sont toutes respectées ?", nok:'NON', info:"Préconisations non respectées"},
+    {name:'dernier_entretien_audi',label:"Le dernier entretien a été fait chez Audi ?",    nok:'NON', info:"Entretien non réalisé chez Audi"},
+    {name:'vendu_client',    label:"Si non, est-il vendu au client et réalisé en même temps que la réparation ?", nok:null},
+    {name:'lien_entretien',  label:"Un lien peut être établi entre la cause du dommage et l'entretien ?", nok:'OUI', info:"Lien dommage/entretien détecté"}
+  ],
+  'SEAT': [
+    {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
+    {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
+    {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
+    {name:'preconisations',  label:"Les préconisations constructeur pour les entretiens sont toutes respectées ?", nok:'NON', info:"Préconisations non respectées"},
+    {name:'dernier_entretien',label:"Le dernier entretien est-il présent ?",                     nok:'NON', info:"Dernier entretien manquant"},
+    {name:'vendu_client',    label:"Si non, est-il vendu au client et réalisé en même temps que la réparation ?", nok:null},
+    {name:'lien_entretien',  label:"Un lien peut être établi entre la cause du dommage et l'entretien ?", nok:'OUI', info:"Lien dommage/entretien détecté"}
+  ],
+  'SKODA': [
+    {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
+    {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
+    {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
+    {name:'preconisations',  label:"Tous les entretiens ont été réalisés en respectant les préconisations du constructeur (Km/durée) ? (Aucun entretien n'est à faire)", nok:'NON', info:"Préconisations non respectées"},
+    {name:'entretien_moment',label:"Un entretien est-il à faire au moment de la réparation ? (Échéance non dépassée)", nok:null, has_nc:true},
+    {name:'vendu_client',    label:"Si oui, est-il vendu au client et réalisé en même temps que la réparation ?", nok:null},
+    {name:'justificatifs',   label:"Disposez-vous des justificatifs des 2 derniers entretiens ? (Hors entretien fait au moment de la réparation)", nok:'NON', info:"Justificatifs manquants"},
+    {name:'justif_preco',    label:"Si oui, ont-ils été réalisés en respectant les préconisations constructeur ?", nok:'NON', info:"Préconisations non respectées sur les 2 derniers entretiens"},
+    {name:'lien_entretien',  label:"Un lien peut être établi entre la cause du dommage et l'entretien ?", nok:'OUI', info:"Lien dommage/entretien détecté"}
+  ]
+};
+
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// ÉTAT GLOBAL
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+var G = {
+  role: '',        // 'usager' | 'team'
+  site: '',        // site usager
+  demandes: [],
+  activeId: null,  // demande en cours de validation
+  kulanzData: {}, // copie kulanz pour CCR
+  fbListening: false,
+  demandeType: 'K' // K = Kulanz, C = CCR
+};
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// FIREBASE — init différée dans try/catch
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+var db = null;
+var demandesRef = null;
+
+function initFirebase() {
+  if (typeof firebase === 'undefined') {
+    console.warn('Firebase non chargé');
+    return;
+  }
+  try {
+    var cfg = {
+      apiKey:"AIzaSyDUf2WrUO6Lo4I2Dj9hLcEW70tZMHyx3sw",
+      authDomain:"kulanz-autho.firebaseapp.com",
+      databaseURL:"https://kulanz-autho-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:"kulanz-autho",
+      storageBucket:"kulanz-autho.firebasestorage.app",
+      messagingSenderId:"852790118871",
+      appId:"1:852790118871:web:72904a41268839eba12392"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    db = firebase.database();
+    demandesRef = db.ref('demandes');
+    db.ref('.info/connected').on('value', function(snap) {
+      var dot = ge('db-dot');
+      if (dot) dot.style.background = snap.val() ? '#27ae60' : '#e74c3c';
+    });
+    return true;
+  } catch(e) {
+    console.error('Firebase init failed:', e);
+    toast('⚠ Mode hors ligne — Firebase indisponible');
+    return false;
+  }
 }
 
-/* ── RESET ── */
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:var(--font-body);background:var(--bg);color:var(--dark);min-height:100vh;overflow-x:hidden}
-button{cursor:pointer;font-family:var(--font-body)}
-input,select,textarea{font-family:var(--font-body)}
+function startListener() {
+  if (G.fbListening || !demandesRef || !db) return;
+  G.fbListening = true;
+  demandesRef.on('value', function(snap) {
+    G.demandes = [];
+    snap.forEach(function(c) { G.demandes.push(c.val()); });
+    G.demandes.sort(function(a,b) { return String(b.id) > String(a.id) ? 1 : -1; });
+    try { localStorage.setItem('gea_demandes', JSON.stringify(G.demandes)); } catch(e) {}
+    renderHisto();
+    if (G.role === 'team') renderDash();
+  }, function(err) {
+    console.warn('Firebase offline:', err);
+    try {
+      var s = localStorage.getItem('gea_demandes');
+      G.demandes = s ? JSON.parse(s) : [];
+    } catch(e) { G.demandes = []; }
+    renderHisto();
+  });
+}
 
-/* ── LOGIN ── */
-#login-page{position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;background:var(--dark);z-index:9999;display:flex;align-items:center;justify-content:center;overflow-y:auto}
-#login-page.hidden{display:none!important}
-.lp-wrap{width:100%;max-width:500px;padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:26px}
-.lp-logo{font-size:22px;font-weight:500;color:#fff;text-align:center;letter-spacing:-.3px}
-.lp-logo span{color:var(--gold2)}
-.lp-sub{font-size:11px;color:rgba(255,255,255,0.45);letter-spacing:2px;text-transform:uppercase;text-align:center;margin-top:2px}
-.lp-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
-.lp-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:22px 16px;text-align:center;cursor:pointer;transition:all .2s;color:#fff}
-.lp-card:hover{background:rgba(77,201,168,0.12);border-color:var(--gold2);transform:translateY(-2px)}
-.lp-card-icon{width:42px;height:42px;border-radius:10px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:20px}
-.lp-card-icon.user{background:rgba(77,201,168,0.15);color:var(--gold2)}
-.lp-card-icon.team{background:rgba(255,185,55,0.15);color:#FFB937}
-.lp-card-title{font-size:14px;font-weight:500;margin-bottom:5px;color:#fff}
-.lp-card-desc{font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5}
-.lp-sites{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:100%}
-.lp-site{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:9px;padding:10px;font-size:13px;color:rgba(255,255,255,0.8);text-align:center;cursor:pointer;transition:all .2s;font-weight:500}
-.lp-site:hover{background:rgba(77,201,168,0.15);border-color:var(--gold2);color:#fff}
-.lp-site.span2{grid-column:1/-1;max-width:48%;margin:0 auto}
-.lp-back{background:none;border:none;color:rgba(255,255,255,0.4);font-size:13px;text-decoration:underline;margin-top:6px;cursor:pointer}
-.lp-back:hover{color:rgba(255,255,255,0.7)}
-#lp-step2,#lp-step3{width:100%}
-#lp-site-select,#lp-auth-form{width:100%}
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// UTILITAIRES
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function ge(id) { return document.getElementById(id); }
 
-.guide-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:9px;color:rgba(255,255,255,0.6);font-size:12px;padding:8px 16px;display:flex;align-items:center;gap:7px;transition:all .2s}
-.guide-btn:hover{background:rgba(77,201,168,0.15);border-color:var(--gold2);color:#fff}
 
-/* Auth inputs */
-.lp-auth-input{width:100%;padding:10px 14px;background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,0.15);border-radius:9px;color:#fff;font-size:13px;outline:none;transition:border .2s}
-.lp-auth-input:focus{border-color:var(--gold2);background:rgba(77,201,168,0.1)}
-.lp-auth-input::placeholder{color:rgba(255,255,255,0.3)}
-.lp-auth-label{color:rgba(255,255,255,0.55);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px}
-.lp-connect-btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s}
-.lp-connect-btn:hover{background:var(--accent2);transform:translateY(-1px)}
-.lp-auth-error{display:none;color:#FF8080;font-size:12px;text-align:center;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);padding:8px 12px;border-radius:7px}
-.lp-reset-link{background:none;border:none;color:rgba(77,201,168,0.7);font-size:11px;cursor:pointer;text-decoration:underline;padding:0}
-.lp-reset-link:hover{color:var(--gold2)}
+function ouvrirOutlookCCR() {
+  var ml = window._lastMailto || '';
+  if (!ml) { toast('⚠ Aucun mail préparé.'); return; }
+  try {
+    var _a = document.createElement('a');
+    _a.href = ml;
+    _a.style.display = 'none';
+    document.body.appendChild(_a);
+    _a.click();
+    setTimeout(function(){ document.body.removeChild(_a); }, 500);
+  } catch(e) {
+    window.location.href = ml;
+  }
+}
 
-/* Modal mot de passe */
-#pwd-modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;display:none;align-items:center;justify-content:center}
-#pwd-modal.open{display:flex}
-.pm-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:360px;box-shadow:var(--shadow-md)}
-.pm-box h3{font-size:17px;font-weight:500;margin-bottom:6px;color:var(--dark)}
-.pm-box p{font-size:13px;color:var(--silver);margin-bottom:18px}
-.pm-error{font-size:12px;color:var(--red);margin-top:5px;display:none}
+function copierObjetMail() {
+  var subj = window._ccrSubject || '';
+  try {
+    var t = document.createElement('textarea');
+    t.value = subj;
+    t.style.position = 'fixed';
+    t.style.opacity  = '0';
+    document.body.appendChild(t);
+    t.focus(); t.select();
+    document.execCommand('copy');
+    document.body.removeChild(t);
+    toast('✔ Objet copié !');
+  } catch(e) { alert('Objet : ' + subj); }
+}
 
-/* ── HEADER ── */
-header{background:#ffffff;border-bottom:1px solid #E2E8EF;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(13,45,74,0.06);transition:transform .3s ease;will-change:transform}
-header.header-hidden{transform:translateY(-100%)}
-.h-top{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:52px}
-.h-logo{font-size:15px;font-weight:500;color:var(--dark)}
-.h-logo span{color:var(--accent)}
-.h-nav{display:flex;gap:4px}
-.nav-tab{padding:7px 14px;border-radius:7px;font-size:13px;color:var(--silver);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;border:none;background:none;font-weight:500}
-.nav-tab.active{background:#EAF8F5;color:var(--accent);font-weight:500}
-.nav-tab:hover:not(.active){background:#F0F4F7;color:var(--dark)}
-.h-r{display:flex;align-items:center;gap:10px}
-#h-user{display:flex;align-items:center;gap:9px}
-.h-role{font-size:11px;font-weight:500;color:#8A5A00;background:#FFF8E8;padding:4px 10px;border-radius:20px;border:1px solid #FFD98C}
-#h-site-name{font-size:12px;color:#0B7A6E;font-weight:500;background:#EAF8F5;padding:4px 11px;border-radius:20px;border:1px solid #80D4C8}
-.h-alert{font-size:11px;background:#FFF3E0;color:#E65100;padding:4px 10px;border-radius:20px;border:1px solid #FFCC80}
-.btn-deconnect{background:#fff;border:1px solid #D4DCE5;border-radius:7px;color:var(--silver);font-size:12px;padding:6px 12px;display:flex;align-items:center;gap:5px;transition:all .2s}
-.btn-deconnect:hover{background:#FEF0F0;border-color:#F0A0A0;color:var(--red)}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function decodeLabel(s) {
+  return String(s||'').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+}
+function gv(name) {
+  var el = document.querySelector('#mainForm [name="'+name+'"]');
+  return el ? el.value.trim() : '';
+}
+function sv(name, val) {
+  var el = document.querySelector('#mainForm [name="'+name+'"]');
+  if (el && val !== undefined) el.value = val;
+}
+function gr(name) {
+  var el = document.querySelector('#mainForm [name="'+name+'"]:checked');
+  return el ? el.value : '';
+}
+function toast(msg) {
+  var t = ge('toast');
+  if (!t) { console.log('[toast]', msg); return; }
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { if(ge('toast')) ge('toast').classList.remove('show'); }, 3200);
+}
+function isValidVIN(v) {
+  if (!v || v.length !== 17) return false;
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/i.test(v)) return false;
+  if (/^(.)\1{16}$/.test(v)) return false;
+  return true;
+}
+function vinHint(v) {
+  if (!v) return '0 / 17 caractères';
+  if (/[IOQ]/i.test(v)) return v.length+' / 17 — ⚠ I, O, Q interdits';
+  if (v.length < 17) return v.length+' / 17 — incomplet';
+  if (isValidVIN(v)) return '✔ Châssis valide';
+  return '⚠ Format invalide';
+}
 
-/* Site bar */
-#site-bar{border-top:1px solid #E2E8EF;padding:8px 28px;background:#F7FAFB}
-.s-btns{display:flex;gap:7px;flex-wrap:wrap}
-.s-btn{background:#fff;border:1px solid #D4DCE5;border-radius:7px;color:var(--silver);font-size:12px;padding:5px 13px;cursor:pointer;transition:all .15s;font-weight:500}
-.s-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.s-btn:hover:not(.active){background:#EAF8F5;border-color:#80D4C8;color:var(--dark)}
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// LOGIN
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function showStep2() {
+  ge('lp-step1').style.display = 'none';
+  ge('lp-step2').style.display = 'block';
+  // Montrer d'abord la sélection de site
+  if (ge('site-select-step')) ge('site-select-step').style.display = 'block';
+  if (ge('auth-form')) ge('auth-form').style.display = 'none';
+}
+function showStep1() {
+  ge('lp-step2').style.display = 'none';
+  ge('lp-step1').style.display = 'block';
+}
+function openPwdModal() {
+  ge('pwd-modal').classList.add('open');
+  setTimeout(function() { ge('pwd-input').focus(); }, 100);
+}
+function closePwdModal() {
+  ge('pwd-modal').classList.remove('open');
+  ge('pwd-input').value = '';
+  ge('pwd-error').style.display = 'none';
+}
+function submitPwd() {
+  if (ge('pwd-input').value !== MOT_DE_PASSE) {
+    ge('pwd-error').style.display = 'block';
+    ge('pwd-input').focus();
+    return;
+  }
+  closePwdModal();
+  G.role = 'team';
+  G.site = '';
+  ouvrirApp();
+}
+function loginUsager(site) {
+  G.role = 'usager';
+  G.site = site;
+  ouvrirApp();
+}
 
-/* ── PAGES ── */
-.page{display:none}
-.page.active{display:block}
-.page-wrap{max-width:840px;margin:0 auto;padding:22px 20px}
 
-/* ── FORM TABS ── */
-.form-tabs{display:flex;gap:8px;padding:18px 0 4px}
-.form-tab{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;border:1.5px solid transparent;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px}
-.form-tab.active{background:var(--dark);color:var(--gold2);border-color:rgba(77,201,168,0.2)}
-.form-tab:not(.active){background:var(--card);color:var(--silver);border-color:#D4DCE5}
-.form-tab:hover:not(.active){border-color:#80D4C8;color:var(--dark)}
+// ══════════════════════════════════════════════════════
+// FIREBASE AUTH — Option 3 (e-mail @geauto.fr)
+// ══════════════════════════════════════════════════════
 
-/* Btn copier */
-.btn-copy-kulanz{background:#EAF8F5;border:1px solid #80D4C8;border-radius:8px;color:#0B7A6E;font-size:12px;padding:7px 14px;display:flex;align-items:center;gap:6px;margin-bottom:16px;font-weight:500;transition:all .2s}
-.btn-copy-kulanz:hover{background:#D5F0EA}
+function focusAuthPwd() {
+  var p = ge('auth-pwd'); if (p) p.focus();
+}
 
-/* ── FORM CARD ── */
-.form-card{background:var(--card);border-radius:10px;border:1px solid #E2E8EF;box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
-.fc-head{display:flex;align-items:center;gap:10px;padding:12px 18px;background:#F7FAFB;border-bottom:2px solid var(--accent)}
-.fc-num{width:24px;height:24px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0}
-.fc-title{font-size:13px;font-weight:500;color:var(--dark)}
-.fc-body{padding:16px}
+function connecterUsager() {
+  var email = (ge('auth-email') ? ge('auth-email').value : '').trim();
+  var pwd   = ge('auth-pwd')   ? ge('auth-pwd').value   : '';
+  var err   = ge('auth-error');
 
-/* ── FIELDS ── */
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-.field{display:flex;flex-direction:column;gap:4px}
-.field.full{grid-column:1/-1}
-.field label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;color:var(--silver)}
-.field input,.field textarea,.field select{border:1.5px solid #D4DCE5;border-radius:7px;padding:8px 11px;font-size:13px;color:var(--dark);background:#fff;transition:all .2s}
-.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,153,170,0.1)}
-.field input[readonly]{background:#EAF8F5;border-color:#80D4C8;color:var(--green);font-weight:500}
-.field textarea{resize:vertical;min-height:70px;line-height:1.5}
-.chassis-valid{font-size:11px;color:var(--green);margin-top:3px;display:none;font-weight:500}
-.or-count{font-size:11px;color:var(--silver);margin-top:3px}
+  // Validation e-mail @geauto.fr
+  if (!email) {
+    if (err) { err.textContent = 'Saisissez votre e-mail.'; err.style.display = 'block'; }
+    ge('auth-email').focus(); return;
+  }
+  if (!email.toLowerCase().endsWith('@geauto.fr')) {
+    if (err) { err.textContent = 'Utilisez votre e-mail professionnel @geauto.fr'; err.style.display = 'block'; }
+    ge('auth-email').focus(); return;
+  }
+  if (!pwd) {
+    if (err) { err.textContent = 'Saisissez votre mot de passe.'; err.style.display = 'block'; }
+    ge('auth-pwd').focus(); return;
+  }
+  if (err) err.style.display = 'none';
 
-/* ── CATEGORIES ── */
-.cat-btns{display:flex;flex-wrap:wrap;gap:7px}
-.cat-btn{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:7px;border:1.5px solid #D4DCE5;background:#fff;font-size:12px;color:var(--silver);cursor:pointer;transition:all .2s;font-weight:500}
-.cat-btn.active{background:var(--dark);color:var(--gold2);border-color:transparent}
-.cat-btn:hover:not(.active){border-color:var(--accent);color:var(--dark);background:#EAF8F5}
-.cat-icon{font-size:15px}
-.saisie-libre-wrap{margin-top:10px;display:none}
-.saisie-libre-wrap.show{display:block}
+  // Bouton en chargement
+  var btn = document.querySelector('#lp-step2 button[onclick="connecterUsager()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
 
-/* ── DROPDOWN SEARCH ── */
-.ss-wrap{position:relative;width:100%}
-.ss-input-wrap{display:flex;align-items:center;border:1.5px solid #D4DCE5;border-radius:7px;background:#fff;overflow:hidden;transition:all .2s}
-.ss-input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,153,170,0.1)}
-.ss-icon{padding:0 8px 0 10px;color:var(--silver);font-size:14px;flex-shrink:0}
-.ss-input{border:none;background:transparent;padding:8px 6px 8px 0;font-size:13px;color:var(--dark);width:100%;outline:none}
-.ss-arrow{padding:0 10px;color:var(--silver);font-size:11px;cursor:pointer;flex-shrink:0}
-.ss-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid #D4DCE5;border-radius:9px;box-shadow:0 6px 20px rgba(13,45,74,0.12);z-index:200;max-height:220px;overflow-y:auto;overflow-x:visible;display:none}
-.ss-drop.open{display:block}
-.ss-item{padding:9px 14px;font-size:13px;cursor:pointer;color:var(--dark);border-bottom:.5px solid #F0F4F7;transition:background .1s}
-.ss-item:last-child{border-bottom:none}
-.ss-item:hover{background:#EAF8F5}
-.ss-item.selected{background:#EAF8F5;color:var(--green);font-weight:500}
-.ss-empty{padding:10px 14px;font-size:13px;color:var(--silver)}
-input[name="ava-val"]:disabled,.ss-input:disabled{opacity:.5;cursor:not-allowed}
+  // Firebase Auth — s'assurer que Firebase est initialisé
+  if (typeof firebase === 'undefined') {
+    if (err) { err.textContent = 'Erreur : Firebase non chargé. Rechargez la page.'; err.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+    return;
+  }
+  // Initialiser Firebase si pas encore fait
+  if (!firebase.apps || !firebase.apps.length) { initFirebase(); }
+  if (!firebase.auth || typeof firebase.auth !== 'function') {
+    if (err) { err.textContent = 'Service auth indisponible. Rechargez la page.'; err.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+    return;
+  }
 
-/* ── VERIFS KULANZ ── */
-.verifblock{display:flex;flex-direction:column;gap:8px}
-.chk-row{display:flex;flex-direction:column;gap:6px}
-.chk-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;color:var(--silver);padding:4px 0;border-bottom:1px solid #EEF2F5;margin-bottom:2px}
-.chk-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dark);cursor:pointer;padding:2px 0}
-.chk-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
-.tpi-block{display:none;margin-top:6px}
-.tpi-block.show{display:block}
-.tpi-input{width:100%;border:1.5px solid #D4DCE5;border-radius:7px;padding:8px 12px;font-size:13px;color:var(--dark)}
-.tpi-input:focus{outline:none;border-color:var(--accent)}
-.nok-zone{display:none}
-.nok-zone.show{display:block}
-.knok-box{border-radius:8px;padding:12px 14px;margin-top:8px;font-size:13px;line-height:1.5;font-weight:500}
-.knok-box.rouge{background:#FCEAEA;border:1.5px solid #F0A0A0;color:#8B1A1A}
-.knok-box.jaune{background:#FFF8E8;border:1.5px solid #FFD98C;color:#7A5800}
-.knok-box.orange{background:#FFF3E0;border:1.5px solid #FFCC80;color:#7A3800}
+  firebase.auth().signInWithEmailAndPassword(email, pwd)
+    .then(function() {
+      G.role = 'usager';
+      // G.site déjà défini par loginUsager()
+      ouvrirApp();
+    })
+    .catch(function(e) {
+      var msg = 'E-mail ou mot de passe incorrect.';
+      if (e.code === 'auth/user-not-found')   msg = 'Compte introuvable. Contactez teamgarantie@geauto.fr';
+      if (e.code === 'auth/wrong-password')   msg = 'Mot de passe incorrect.';
+      if (e.code === 'auth/invalid-email')    msg = 'E-mail invalide.';
+      if (e.code === 'auth/too-many-requests')msg = 'Trop de tentatives. Réessayez dans quelques minutes.';
+      if (err) { err.textContent = msg; err.style.display = 'block'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+    });
+}
 
-/* ── BOUTON ENVOYER ── */
-.btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:8px}
-.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,153,170,0.25)}
+function deconnecterUsager() {
+  if (firebase && firebase.auth) {
+    firebase.auth().signOut().catch(function(e){ console.warn(e); });
+  }
+}
 
-/* ── HISTORIQUE ── */
-.histo-filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.hf-select{border:1.5px solid #D4DCE5;border-radius:7px;padding:7px 12px;font-size:13px;background:#fff;color:var(--dark);cursor:pointer;font-weight:500}
-.hf-select:focus{outline:none;border-color:var(--accent)}
-.btn-vider-histo{background:#FEF0F0;border:1.5px solid #F0A0A0;border-radius:7px;color:#8B1A1A;font-size:12px;padding:7px 12px;display:flex;align-items:center;gap:5px;font-weight:500;margin-left:auto}
-.btn-vider-histo:hover{background:#FCEAEA}
-.histo-table-wrap{background:var(--card);border-radius:10px;border:1px solid #E2E8EF;box-shadow:var(--shadow);overflow:hidden}
-.table-box{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-th{padding:11px 14px;text-align:left;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;color:#fff;background:var(--dark)}
-th:first-child{border-left:3px solid var(--accent)}
-td{padding:11px 14px;border-bottom:1px solid #F0F4F7;font-size:13px;vertical-align:middle;color:var(--dark)}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:#F7FAFB}
-.badge{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.badge-ok,.b-ok{background:#EAF8F5;color:#0B7A6E;border:1px solid #80D4C8}
-.badge-nok,.b-no{background:#FCEAEA;color:#8B1A1A;border:1px solid #F0A0A0}
-.badge-wait,.b-wait{background:#FFF8E8;color:#8A5A00;border:1px solid #FFD98C}
-.badge-warn,.b-comp{background:#EAF2FB;color:#0C447C;border:1px solid #85B7EB}
-.btn-valider{background:var(--dark);color:var(--gold2);border:none;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
-.btn-valider:hover{background:var(--accent);color:#fff}
+function ouvrirApp() {
+  ge('login-page').classList.add('hidden');
+  // Afficher le header et la zone utilisateur
+  var mh = ge('main-header') || document.querySelector('header');
+  if (mh) mh.style.display = '';
+  ge('h-user').style.display = 'flex';
+  ge('tab-histo').style.display = 'block';
 
-/* Stats dashboard */
-.dash-wrap{display:none;margin-bottom:18px}
-.dash-wrap.on{display:block}
-.sites-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
-.site-card{background:var(--card);border-radius:9px;border:1px solid #E2E8EF;padding:14px 16px;min-width:160px;box-shadow:var(--shadow);border-top:3px solid var(--accent)}
-.site-card h4{font-size:11px;font-weight:500;color:var(--dark);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
-.stat-row{display:flex;gap:12px}
-.stat-n{font-size:22px;font-weight:500;color:var(--dark)}
-.stat-n.green{color:var(--green)}
-.stat-n.red{color:var(--red)}
-.stat-l{font-size:10px;color:var(--silver);margin-top:2px;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
-.stat-col{display:flex;flex-direction:column;align-items:center}
+  if (G.role === 'team') {
+    ge('h-role').textContent = '🔐 TeamGarantie';
+    // TeamGarantie: accès total — formulaire + historique + tous les sites
+    ge('site-bar').style.display = 'block'; // Visible pour choisir le site
+    ge('dash-wrap').classList.add('on');
+    ge('h-site-name').textContent = 'Tous les sites';
+    // Permettre la sélection de site dans le formulaire
+    var fsite = ge('f-site');
+    if (fsite) { fsite.disabled = false; fsite.readOnly = false; }
+    var fsdisplay = ge('site-display');
+    if (fsdisplay) { fsdisplay.disabled = false; fsdisplay.readOnly = false; }
+    ge('site-field').style.display = 'flex';
+    renderKulanzForm('VW Bischheim'); // défaut VW pour TeamGarantie
+  } else {
+    ge('h-role').textContent = '👤 ' + G.site;
+    ge('site-bar').style.display = 'none';
+    ge('h-site-name').textContent = G.site;
+    // Remplir les champs site dans le formulaire
+    var fs = ge('f-site'); if (fs) { fs.value = G.site; fs.readOnly = true; }
+    var sd = ge('site-display'); if (sd) { sd.value = G.site; sd.readOnly = true; }
+    ge('site-field').style.display = 'flex';
+    // KVPS
+    var kv = ge('kvps'); if (kv) { kv.value = KVPS_MAP[G.site] || ''; kv.readOnly = true; }
+    var kvn = document.querySelector('[name="kvps"]'); if (kvn) { kvn.value = KVPS_MAP[G.site] || ''; kvn.readOnly = true; }
+    renderKulanzForm(G.site);
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
+      b.classList.toggle('active', b.textContent.trim() === G.site);
+    });
+    var kvpsEl = ge('kvps');
+    if (kvpsEl) { kvpsEl.value = KVPS_MAP[G.site] || ''; kvpsEl.readOnly = true; }
+    // Aussi remplir via le champ name= (compatibilité)
+    var kvpsName = document.querySelector('[name="kvps"]');
+    if (kvpsName) { kvpsName.value = KVPS_MAP[G.site] || ''; kvpsName.readOnly = true; }
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
+      b.classList.toggle('active', b.textContent.trim() === G.site);
+    });
+  }
 
-/* ── SIDE PANEL ── */
-#sp-overlay{position:fixed;inset:0;background:rgba(13,45,74,0.4);z-index:700;display:none}
-#sp-overlay.open{display:block}
-#side-panel{position:fixed;top:0;right:0;bottom:0;width:490px;max-width:100vw;background:#fff;box-shadow:-6px 0 32px rgba(13,45,74,0.12);z-index:701;transform:translateX(100%);transition:transform .32s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column}
-#side-panel.open{transform:translateX(0)}
-.sp-head{background:#fff;border-bottom:2px solid var(--accent);padding:16px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.sp-head-icon{width:36px;height:36px;background:#EAF8F5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:18px;flex-shrink:0}
-.sp-head-text{flex:1}
-.sp-head-text h3{font-size:15px;font-weight:500;color:var(--dark);margin-bottom:2px}
-.sp-head-text p{font-size:11px;color:var(--silver)}
-.sp-close{background:none;border:none;color:var(--silver);font-size:20px;cursor:pointer;padding:4px;line-height:1;transition:color .2s}
-.sp-close:hover{color:var(--dark)}
-.sp-body{flex:1;overflow-y:auto;padding:16px 20px;min-height:0;background:#F7FAFB}
-.sp-sec{margin-bottom:12px;background:#fff;border-radius:9px;padding:14px;border:1px solid #E2E8EF;box-shadow:0 1px 3px rgba(13,45,74,0.05)}
-.sp-sec-title{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.7px;color:var(--silver);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #EEF2F5}
-.sp-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sp-info{display:flex;flex-direction:column;gap:3px;background:#F7FAFB;padding:8px 10px;border-radius:7px;border:1px solid #EAF0F5}
-.sp-info-l{font-size:9px;color:var(--silver);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
-.sp-info-v{font-size:13px;font-weight:500;color:var(--dark)}
-select#sp-statut{width:100%;border:1.5px solid #D4DCE5;border-radius:7px;padding:9px 12px;font-size:13px;background:#fff;cursor:pointer;font-weight:500;color:var(--dark)}
-select#sp-statut:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,153,170,0.1)}
-#sp-comment{width:100%;border:1.5px solid #D4DCE5;border-radius:7px;padding:9px 12px;font-size:13px;resize:vertical;min-height:70px;line-height:1.5;color:var(--dark)}
-#sp-comment:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,153,170,0.1)}
-.sp-pwd-err{font-size:12px;color:var(--red);display:none;padding:6px 0;font-weight:500}
-#sp-commerce{display:none}
-.commerce-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.commerce-field{display:flex;flex-direction:column;gap:4px}
-.commerce-field label{font-size:11px;color:var(--silver);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
-.commerce-field input{border:1.5px solid #D4DCE5;border-radius:7px;padding:8px 12px;font-size:13px;width:100%;color:var(--dark)}
-.commerce-field input:focus{outline:none;border-color:var(--accent)}
-.sp-footer{padding:14px 20px;border-top:1px solid #E2E8EF;display:flex;gap:9px;flex-shrink:0;background:#fff}
-#sp-ok-btn{flex:1;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s}
-#sp-ok-btn:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,153,170,0.25)}
-#sp-ok-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-.sp-cancel-btn{background:#fff;border:1.5px solid #D4DCE5;border-radius:8px;color:var(--silver);font-size:14px;padding:11px 16px;cursor:pointer;font-weight:500;transition:all .2s}
-.sp-cancel-btn:hover{background:#F0F4F7}
+  enableAllDropdowns();
+  // Retirer la feuille anti-flash et remettre les pages visibles
+  var afStyle = document.querySelector('style[data-antiflash]');
+  if (afStyle) afStyle.remove();
+  // Forcer display sur les éléments principaux
+  var pf = ge('page-form');  if (pf) { pf.style.cssText = ''; }
+  var ph = ge('page-histo'); if (ph) { ph.style.cssText = ''; }
+  var so = ge('sp-overlay'); if (so) { so.style.cssText = ''; }
+  initFirebase();
+  startListener();
+  restoreDraft();
+}
 
-/* ── SUCCESS OVERLAY ── */
-#success-overlay{position:fixed;inset:0;background:rgba(13,45,74,0.5);z-index:800;display:none;align-items:center;justify-content:center}
-#success-overlay.show{display:flex}
-.success-box{background:#fff;border-radius:14px;padding:36px;text-align:center;max-width:380px;width:90%;box-shadow:var(--shadow-md);border-top:4px solid var(--accent)}
-.success-icon{font-size:52px;margin-bottom:12px}
-.success-title{font-size:20px;font-weight:500;color:var(--dark);margin-bottom:6px}
-.success-sub{font-size:14px;color:var(--silver);line-height:1.6;margin-bottom:20px}
-.success-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:500;cursor:pointer}
-.success-btn:hover{background:var(--accent2)}
+function deconnecter() {
+  deconnecterUsager();
+  G.role = ''; G.site = ''; G.fbListening = false;
+  var mh2 = ge('main-header') || document.querySelector('header');
+  if (mh2) mh2.style.display = 'none';
+  // Recréer l'anti-flash pour la prochaine connexion
+  if (!document.querySelector('style[data-antiflash]')) {
+    var s=document.createElement('style');
+    s.setAttribute('data-antiflash','1');
+    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;background:#0f1923!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
+    document.head.appendChild(s);
+  }
+  ge('login-page').classList.remove('hidden');
+  ge('lp-step1').style.display = 'block';
+  ge('lp-step2').style.display = 'none';
+  ge('h-user').style.display = 'none';
+  ge('tab-histo').style.display = 'none';
+  ge('dash-wrap').classList.remove('on');
+  ge('h-alert').classList.remove('on');
+  ge('site-bar').style.display = 'none';
+  ge('site-field').style.display = 'none';
+  ge('type-bar').style.display = 'flex';
+  ge('kvps').readOnly = false;
+  [].forEach.call(document.querySelectorAll('.s-btn'), function(b) { b.classList.remove('active'); });
+  ge('f-site').value = '';
+  ge('h-site-name').textContent = '—';
+  ssReset('dom'); ssReset('ava');
+  showPage('form', ge('tab-form'));
+}
 
-/* ── TOAST ── */
-#toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:var(--gold2);padding:12px 18px;border-radius:9px;font-size:13px;font-weight:500;box-shadow:var(--shadow-md);z-index:900;opacity:0;transition:opacity .3s;pointer-events:none;display:flex;align-items:center;gap:8px;border-left:3px solid var(--accent)}
-#toast.show{opacity:1}
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// NAVIGATION
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function showPage(page, tabEl) {
+  [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
+  [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
+  ge('page-'+page).classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+  ge('type-bar').style.display = (page === 'form') ? 'flex' : 'none';
+  if (page === 'histo') renderHisto();
+}
 
-/* ── VIDER MODAL ── */
-#vider-modal{position:fixed;inset:0;background:rgba(13,45,74,0.5);z-index:800;display:none;align-items:center;justify-content:center}
-#vider-modal.open{display:flex}
-.vm-box{background:#fff;border-radius:12px;padding:28px;max-width:400px;width:90%;box-shadow:var(--shadow-md)}
-.vm-box h3{font-size:17px;font-weight:500;margin-bottom:8px;color:var(--dark)}
-.vm-box p{font-size:13px;color:var(--silver);margin-bottom:20px;line-height:1.5}
-.vm-btns{display:flex;gap:10px;justify-content:flex-end}
-.vm-cancel{background:#fff;border:1.5px solid #D4DCE5;border-radius:7px;color:var(--silver);font-size:13px;padding:9px 18px;cursor:pointer;font-weight:500}
-.vm-confirm{background:var(--red);border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:500;padding:9px 18px;cursor:pointer}
+function selectSite(btn, name) {
+  [].forEach.call(document.querySelectorAll('.s-btn'), function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var fsite = ge('f-site'); if(fsite) fsite.value = name;
+  var hn = ge('h-site-name'); if(hn) hn.textContent = name || 'Tous les sites';
+  // Remplir KVPS si usager (readOnly = usager, writable = team)
+  var kvpsEl2 = ge('kvps');
+  if (kvpsEl2 && !kvpsEl2.readOnly) kvpsEl2.value = KVPS_MAP[name] || '';
+  renderKulanzForm(name);
+}
 
-/* ── HIDDEN / UTILS ── */
-.hidden{display:none!important}
-.req{color:var(--red);font-weight:500}
-.opt{color:var(--silver);font-weight:400;font-size:10px}
-.muted{color:var(--silver)}
+function setType(t) {
+  G.demandeType = t;
+  var isK = (t === 'K');
+  if (!isK) saveKulanz();
+  else {
+    // Reset champs CCR
+    [].forEach.call(document.querySelectorAll('[name="pieces[]"]'), function(cb) { cb.checked = false; });
+    [].forEach.call(document.querySelectorAll('[name="kulanz_done"],[name="cig"]'), function(r) { r.checked = false; });
+    var ct = ge('cig-taux'); if (ct) { ct.value = ''; ct.disabled = true; }
+  }
+  ge('btn-k').classList.toggle('active', isK);
+  // Afficher/cacher la case engagement CCR
+  var engWrap = ge('ccr-engagement-wrap');
+  if (engWrap) engWrap.style.display = !isK ? 'block' : 'none';
+  // Réinitialiser la case si on change de type
+  var chkE = ge('chk-engagement');
+  if (chkE && isK) chkE.checked = false;
+  if (isK) {
+    var curSite = ge('f-site') ? ge('f-site').value : '';
+    if (curSite) renderKulanzForm(curSite);
+    setTimeout(checkKulanzNok, 50);
+  }
+  ge('btn-c').classList.toggle('active', !isK);
+  ge('f-type').value = isK ? 'Kulanz' : 'CCR';
+  [].forEach.call(document.querySelectorAll('.k-section'), function(el) { el.style.display = isK ? 'block' : 'none'; });
+  [].forEach.call(document.querySelectorAll('.c-section'), function(el) { el.style.display = !isK ? 'block' : 'none'; });
+  ge('comm-num').textContent = isK ? '4' : '6';
+  ge('btn-copy-kulanz').style.display = isK ? 'flex' : 'none';
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// SEARCHABLE SELECT
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+var ssState = { dom: null, ava: null, desig: null, rub: null };
+
+function ssData(key) {
+  if (key === 'ava') return CODES_AVA;
+  var cat    = ge('dom-cat')   ? ge('dom-cat').value   : '';
+  var rubVal = ge('rub-val')   ? ge('rub-val').value   : '';
+  var desigV = ge('desig-val') ? ge('desig-val').value : '';
+
+  if (key === 'rub') {
+    // Filtrer par catégorie si définie, sinon toutes les rubriques
+    var rubs = (cat && CAT_RUBS[cat]) ? CAT_RUBS[cat] : Object.keys(RUB_LABELS);
+    return rubs.map(function(r){ return {code:r, label:r}; });
+  }
+
+  if (key === 'desig') {
+    var labels = [];
+    if (rubVal && RUB_LABELS[rubVal]) {
+      // Rubrique sélectionnée → ses désignations
+      labels = RUB_LABELS[rubVal];
+    } else if (cat && CAT_RUBS[cat]) {
+      // Catégorie sélectionnée → toutes désignations de ses rubriques
+      var seen = {};
+      CAT_RUBS[cat].forEach(function(rub) {
+        (RUB_LABELS[rub] || []).forEach(function(l) {
+          if (!seen[l]) { seen[l] = true; labels.push(l); }
+        });
+      });
+    } else {
+      // Aucun filtre → toutes les désignations
+      var seen2 = {};
+      Object.keys(RUB_LABELS).forEach(function(rub) {
+        (RUB_LABELS[rub] || []).forEach(function(l) {
+          if (!seen2[l]) { seen2[l] = true; labels.push(l); }
+        });
+      });
+    }
+    return labels.map(function(l){ return {code:l, label:l}; });
+  }
+
+  if (key === 'dom') {
+    // Codes filtrés selon rub + desig disponibles
+    if (rubVal && desigV) {
+      var k = rubVal + '|||' + desigV;
+      var codes = RUB_LABEL_CODES[k] || [];
+      // Fallback si la clé exacte n'existe pas
+      if (!codes.length) {
+        Object.keys(RUB_LABEL_CODES).forEach(function(k2) {
+          if (k2.split('|||')[1] === desigV) codes = codes.concat(RUB_LABEL_CODES[k2]);
+        });
+      }
+      return codes.filter(function(c,i){return codes.indexOf(c)===i;})
+                  .map(function(c){ return {code:c, label:desigV}; });
+    }
+    if (desigV) {
+      var found = [];
+      Object.keys(RUB_LABEL_CODES).forEach(function(k3) {
+        if (k3.split('|||')[1] === desigV) found = found.concat(RUB_LABEL_CODES[k3]);
+      });
+      return found.filter(function(c,i){return found.indexOf(c)===i;})
+                  .map(function(c){ return {code:c, label:desigV}; });
+    }
+    // Scope: par rubrique active, catégorie active, ou tout
+    var scope = rubVal ? [rubVal]
+              : (cat && CAT_RUBS[cat] ? CAT_RUBS[cat] : Object.keys(RUB_LABELS));
+    var all = []; var seenC = {};
+    scope.forEach(function(rub) {
+      Object.keys(RUB_LABEL_CODES).forEach(function(k4) {
+        if (k4.split('|||')[0] === rub) {
+          var lbl = k4.split('|||')[1];
+          RUB_LABEL_CODES[k4].forEach(function(c) {
+            if (!seenC[c]) { seenC[c] = true; all.push({code:c, label:lbl}); }
+          });
+        }
+      });
+    });
+    all.sort(function(a,b){ return parseInt(a.code) - parseInt(b.code); });
+    return all;
+  }
+  return [];
+}
+
+
+
+function ssClear(key) {
+  ssState[key] = null;
+  var valEl = ge(key + '-val');
+  if (valEl) { valEl.value = ''; if (valEl.dataset) valEl.dataset.manual = ''; }
+  var lblEl = ge(key + '-lbl'); if (lblEl) lblEl.value = '';
+  var btn   = ge('ss-' + key + '-btn'); if (btn) btn.classList.remove('filled');
+  var hint  = ge('ss-' + key + '-hint'); if (hint){ hint.textContent=''; hint.className='hint'; }
+  var txt   = ge('ss-' + key + '-txt');
+  var ph = {
+    rub:   'Rechercher une rubrique…',
+    desig: 'Rechercher une désignation…',
+    dom:   'Rechercher par code ou libéllé…',
+    ava:   'Sélectionner un code avarie…'
+  };
+  if (txt) txt.textContent = ph[key] || 'Sélectionner…';
+  // Propager le reset vers le bas
+  if (key === 'rub') {
+    var rv = ge('rub-val'); if (rv) rv.value = '';
+    resetBelow('rub');
+  } else if (key === 'desig') {
+    resetBelow('desig');
+  }
+  ssClose();
+  saveDraft();
+}
+
+
+function ssReset(key) {
+  ssClear(key);
+}
+function ssResetDesig() {
+  ssState['desig'] = null;
+  var dv = ge('desig-val'); if(dv){dv.value='';dv.dataset.manual='';}
+  var dBtn=ge('ss-desig-btn'); if(dBtn){dBtn.classList.remove('filled');
+    var t=dBtn.querySelector('.ss-txt');
+    if(t)t.textContent='🔍 Rechercher une désignation…';}
+  var dHint=ge('ss-desig-hint'); if(dHint){dHint.textContent='';dHint.className='hint';}
+  ssReset('dom');
+  var domBtn=ge('ss-dom-btn'); if(domBtn){domBtn.classList.remove('filled');
+    var t2=domBtn.querySelector('.ss-txt');
+    if(t2)t2.textContent='🔍 Rechercher par code ou libéllé…';}
+}
+
+function ssSet(key, code, label) {
+  if (!code) return;
+  ssPick(key, code, label||'');
+}
+
+function ssToggle(key) {
+  var drop = ge('ss-' + key + '-drop');
+  var btn  = ge('ss-' + key + '-btn');
+  if (!drop || !btn) return;
+  var isOpen = drop.classList.contains('open');
+  ssClose();
+  if (!isOpen) {
+    drop.classList.add('open');
+    btn.classList.add('open');
+    var inp = ge('ss-' + key + '-inp');
+    ssRender(key, inp ? inp.value : '');
+    if (inp) inp.focus();
+  }
+}
+
+
+function ssClose() {
+  ['dom','ava','desig','rub'].forEach(function(k) {
+    var d = ge('ss-'+k+'-drop');
+    var b = ge('ss-'+k+'-btn');
+    if (d) d.classList.remove('open');
+    if (b) b.classList.remove('open');
+  });
+}
+
+function ssPickFromEl(el) {
+  var code  = el.getAttribute('data-code');
+  var label = el.getAttribute('data-label');
+  var key   = el.getAttribute('data-key');
+  if (code && key) ssPick(key, code, label || '');
+}
+
+function ssRenderSoft(key) {
+  var drop = ge('ss-'+key+'-drop');
+  if (drop && drop.classList.contains('open')) {
+    var inp = ge('ss-'+key+'-inp');
+    ssRender(key, inp ? inp.value : '');
+  }
+}
+
+function ssRender(key, query) {
+  var items = ssData(key);
+  var q = (query || '').toLowerCase().trim();
+  var filtered;
+  if (!q) {
+    filtered = items;
+  } else if (key === 'dom' || key === 'ava') {
+    // Code: commence par | label: contient
+    filtered = items.filter(function(it) {
+      return it.code.toLowerCase().indexOf(q) !== -1
+          || it.label.toLowerCase().indexOf(q) !== -1;
+    });
+  } else {
+    filtered = items.filter(function(it) {
+      return it.label.toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  var shown = filtered.slice(0, 200);
+  var cnt = ge('ss-' + key + '-cnt');
+  if (cnt) cnt.textContent = filtered.length + ' résultat' + (filtered.length !== 1 ? 's' : '')
+    + (filtered.length > 200 ? ' — 200 affichés' : '');
+  var opts = ge('ss-' + key + '-opts');
+  if (!opts) return;
+  if (!shown.length) { opts.innerHTML = '<div class="ss-empty">Aucun résultat</div>'; return; }
+  var cur = ssState[key] ? ssState[key].code : '';
+  opts.innerHTML = shown.map(function(it) {
+    var sel = (it.code === cur) ? ' sel' : '';
+    var display;
+    if (key === 'dom') {
+      display = '<span class="ss-code" style="font-size:13px;font-weight:700">' + esc(it.code) + '</span>'
+              + '<span class="ss-lbl" style="color:#888;font-size:11px;margin-left:8px">' + esc(it.label) + '</span>';
+    } else if (key === 'ava') {
+      display = '<span class="ss-code">' + esc(it.code) + '</span>'
+              + '<span class="ss-lbl">' + esc(it.label) + '</span>';
+    } else {
+      display = '<span class="ss-lbl">' + esc(it.label) + '</span>';
+    }
+    return '<div class="ss-opt' + sel + '" data-code="' + esc(it.code)
+         + '" data-label="' + esc(it.label) + '" data-key="' + key
+         + '" onclick="ssPickFromEl(this)">' + display + '</div>';
+  }).join('');
+}
+
+function ssPick(key, code, label) {
+  var cleanLabel = decodeLabel(label);
+  ssState[key] = { code: code, label: cleanLabel };
+  var valEl = ge(key + '-val'); if (valEl) valEl.value = code;
+  var lblEl = ge(key + '-lbl'); if (lblEl) lblEl.value = cleanLabel;
+  var txt  = ge('ss-' + key + '-txt');
+  var btn  = ge('ss-' + key + '-btn');
+  if (btn) btn.classList.add('filled');
+  var hint = ge('ss-' + key + '-hint');
+
+  if (key === 'rub') {
+    if (txt)  txt.textContent  = cleanLabel;
+    if (hint) { hint.textContent = '✔ ' + cleanLabel; hint.className = 'hint ok'; }
+    // Stocker dans rub-val AVANT le reset
+    var rv = ge('rub-val'); if (rv) rv.value = cleanLabel;
+    // Reset desig + dom (pas rub lui-même)
+    resetBelow('rub');
+
+  } else if (key === 'desig') {
+    if (txt)  txt.textContent  = cleanLabel;
+    if (hint) { hint.textContent = '✔ ' + cleanLabel; hint.className = 'hint ok'; }
+    var dv = ge('desig-val'); if (dv) dv.value = cleanLabel;
+    // Reset dom seulement
+    resetBelow('desig');
+    // Chercher les codes pour cette désignation
+    var rubVal = ge('rub-val') ? ge('rub-val').value : '';
+    var k      = rubVal + '|||' + cleanLabel;
+    var codes  = RUB_LABEL_CODES[k] || [];
+    if (!codes.length) {
+      Object.keys(RUB_LABEL_CODES).forEach(function(k2) {
+        if (k2.split('|||')[1] === cleanLabel) codes = codes.concat(RUB_LABEL_CODES[k2]);
+      });
+      codes = codes.filter(function(c, i){ return codes.indexOf(c) === i; });
+    }
+    var domBtn = ge('ss-dom-btn');
+    if (domBtn) {
+      domBtn.classList.remove('filled');
+      var dt = domBtn.querySelector('.ss-txt');
+      if (dt) dt.textContent = codes.length === 1
+        ? codes[0]
+        : '❖ ' + codes.length + ' code(s) disponible(s)';
+    }
+    // Auto-sélectionner si 1 seul code
+    if (codes.length === 1) {
+      setTimeout(function(){ ssPick('dom', codes[0], cleanLabel); }, 50);
+    }
+
+  } else if (key === 'dom') {
+    if (txt)  txt.textContent = code;
+    if (hint) { hint.textContent = '✔ ' + code; hint.className = 'hint ok'; }
+    fillCascadeFromCode(code, cleanLabel);
+
+  } else if (key === 'ava') {
+    if (txt)  txt.textContent = code + ' — ' + cleanLabel;
+    if (hint) { hint.textContent = '✔ ' + cleanLabel; hint.className = 'hint ok'; }
+
+  } else {
+    if (txt)  txt.textContent = code + ' — ' + cleanLabel;
+    if (hint) { hint.textContent = '✔ ' + cleanLabel; hint.className = 'hint ok'; }
+  }
+  ssClose();
+  saveDraft();
+}
+
+function fillCascadeFromCode(code, desigLabel) {
+  // Trouver rubrique + catégorie depuis le code
+  var foundRub = '', foundDesig = desigLabel || '', foundCat = '';
+  Object.keys(RUB_LABEL_CODES).forEach(function(k) {
+    if (!foundRub && RUB_LABEL_CODES[k].indexOf(code) !== -1) {
+      var parts  = k.split('|||');
+      foundRub   = parts[0];
+      foundDesig = desigLabel || parts[1];
+    }
+  });
+  if (foundRub) {
+    Object.keys(CAT_RUBS).forEach(function(cat) {
+      if (!foundCat && CAT_RUBS[cat].indexOf(foundRub) !== -1) foundCat = cat;
+    });
+  }
+  var curCat = ge('dom-cat') ? ge('dom-cat').value : '';
+
+  // Remplir désignation si vide ou différente
+  var dv = ge('desig-val');
+  if (dv && foundDesig) {
+    dv.value = foundDesig;
+    ssState['desig'] = { code: foundDesig, label: foundDesig };
+    var db = ge('ss-desig-btn');
+    if (db) {
+      db.classList.add('filled');
+      var dt = db.querySelector('.ss-txt'); if (dt) dt.textContent = foundDesig;
+    }
+    var dh = ge('ss-desig-hint');
+    if (dh) { dh.textContent = '✔ ' + foundDesig; dh.className = 'hint ok'; }
+  }
+  // Remplir rubrique si vide
+  var rv = ge('rub-val');
+  if (rv && foundRub && !rv.value) {
+    rv.value = foundRub;
+    ssState['rub'] = { code: foundRub, label: foundRub };
+    var rb = ge('ss-rub-btn');
+    if (rb) {
+      rb.classList.add('filled');
+      var rt = rb.querySelector('.ss-txt'); if (rt) rt.textContent = foundRub;
+    }
+    var rh = ge('ss-rub-hint');
+    if (rh) { rh.textContent = '✔ ' + foundRub; rh.className = 'hint ok'; }
+  }
+  // Remplir catégorie si vide
+  if (foundCat && !curCat) {
+    var ci = ge('dom-cat'); if (ci) ci.value = foundCat;
+    [].forEach.call(document.querySelectorAll('.cat-btn'), function(b) {
+      b.classList.toggle('active', b.getAttribute('data-cat') === foundCat);
+    });
+    var ch = ge('cat-hint');
+    if (ch) { ch.textContent = '✔ ' + foundCat; ch.className = 'hint ok'; }
+  }
+}
+
+
+function ssFilter(key, q) { ssRender(key, q); }
+
+// Fermer sur clic extérieur
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'vider-modal') closeViderModal();
+  if (!e.target.closest('.ss-wrap')) ssClose();
+  if (!e.target.closest('.ac-wrap')) {
+    var ac = ge('chassis-ac');
+    if (ac) ac.classList.remove('open');
+  }
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { ssClose(); closeSP(); closeViderModal(); }
+});
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// AUTOCOMPLETE CHÂSSIS
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function onChassis(input) {
+  var v = input.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,17);
+  input.value = v;
+  var hint = ge('chassis-hint');
+  if (hint) { hint.textContent = vinHint(v); hint.className = 'hint' + (isValidVIN(v) ? ' ok' : v.length ? ' err' : ''); }
+  input.className = isValidVIN(v) ? 'ok' : v.length ? 'invalid' : '';
+  // Autocomplete depuis historique
+  var ac = ge('chassis-ac');
+  if (!ac || v.length < 5) { if(ac) ac.classList.remove('open'); return; }
+  var seen = {};
+  var matches = G.demandes.filter(function(d) {
+    if (d.chassis && d.chassis.indexOf(v)===0 && !seen[d.chassis]) { seen[d.chassis]=true; return true; }
+    return false;
+  }).slice(0,5);
+  if (!matches.length) { ac.classList.remove('open'); return; }
+  ac.innerHTML = matches.map(function(d) {
+    return '<div class="ac-item" data-vin="'+esc(d.chassis)+'" onclick="acPick(this)">'+
+      '<div class="ac-vin">'+esc(d.chassis)+'</div>'+
+      '<div class="ac-det">'+esc(d.site)+' — OR '+esc(d.or||'')+'</div></div>';
+  }).join('');
+  ac.classList.add('open');
+}
+
+function acPick(el) {
+  var vin = el.getAttribute('data-vin');
+  var d = G.demandes.find(function(x) { return x.chassis === vin; });
+  var acEl = ge('chassis-ac'); if(acEl) acEl.classList.remove('open');
+  if (!d) return;
+  ge('chassis').value = vin;
+  var hint = ge('chassis-hint');
+  if (hint) { hint.textContent = '✔ Châssis valide'; hint.className = 'hint ok'; }
+  ge('chassis').className = 'ok';
+  if (d.kilometrage) sv('kilometrage', d.kilometrage);
+  if (d.date_or)     sv('date_or', d.date_or);
+  if (d.conseiller_client)  sv('conseiller_client', d.conseiller_client);
+  if (d.email_usager) sv('email_usager', d.email_usager);
+  if (d.kvps && !ge('kvps').readOnly) sv('kvps', d.kvps);
+  if (d.site && G.role === 'team') {
+    ge('f-site').value = d.site;
+    ge('h-site-name').textContent = d.site;
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) { b.classList.toggle('active', b.textContent.trim()===d.site); });
+  }
+  toast('✔ Véhicule reconnu — informations pré-remplies');
+}
+
+function onOR(input) {
+  var v = input.value.replace(/\D/g,'').slice(0,6);
+  input.value = v;
+  var hint = ge('or-hint');
+  if (hint) { hint.textContent = v.length+' / 6 chiffres'; hint.className = 'hint'+(v.length===6?' ok':v.length?' err':''); }
+  input.className = v.length===6 ? 'ok' : v.length ? 'invalid' : '';
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// KULANZ SAVE / COPY
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function saveKulanz() {
+  G.kulanzData = {
+    site:        ge('f-site') ? ge('f-site').value : '',
+    chassis:     gv('chassis'),      kilometrage: gv('kilometrage'),
+    or_number:   gv('or_number'),    date_or:     gv('date_or'),
+    kvps:        gv('kvps'),         conseiller_client:  gv('conseiller_client'),
+    email_usager:gv('email_usager'), plainte_client:gv('plainte_client'),
+    emplacement: gv('emplacement'),  ref_piece:   gv('ref_piece'),
+    dom_cat:     ge('dom-cat')  ? ge('dom-cat').value  : '',
+    dom_rub:     ge('rub-val')  ? ge('rub-val').value  : '',
+    desig_piece: ge('desig-val')? ge('desig-val').value: '',
+    dom_code:    ge('dom-val')  ? ge('dom-val').value  : '',
+    dom_lbl:     ge('dom-lbl')  ? ge('dom-lbl').value  : '',
+    ava_code:    ge('ava-val')  ? ge('ava-val').value  : '',
+    ava_lbl:     ge('ava-lbl')  ? ge('ava-lbl').value  : ''
+  };
+}
+
+function copyKulanz() {
+  saveKulanz(); // S'assurer que les données sont à jour
+  var k = G.kulanzData;
+  if (!k || (!k.chassis && !k.or_number && !k.plainte_client)) {
+    alert('⚠ Aucune donnée Kulanz à copier. Remplissez d’abord le formulaire.');
+    return;
+  }
+  ['chassis','kilometrage','or_number','date_or','kvps','conseiller_client','email_usager',
+   'plainte_client','emplacement','ref_piece'].forEach(function(n) { if(k[n]) sv(n,k[n]); });
+  if (k.site) {
+    ge('f-site').value = k.site;
+    ge('h-site-name').textContent = k.site;
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) { b.classList.toggle('active', b.textContent.trim()===k.site); });
+  }
+  // Restaurer la cascade
+  if (k.dom_cat) {
+    var ci=ge('dom-cat'); if(ci)ci.value=k.dom_cat;
+    var catBtn=document.querySelector('.cat-btn[data-cat="'+k.dom_cat+'"]');
+    if(catBtn)catBtn.classList.add('active');
+    var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+k.dom_cat;ch.className='hint ok';}
+  }
+  if (k.dom_rub) {
+    var rv=ge('rub-val'); if(rv)rv.value=k.dom_rub;
+    ssState['rub']={code:k.dom_rub,label:k.dom_rub};
+    var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
+      var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=k.dom_rub;}
+  }
+  if (k.desig_piece) {
+    var dv=ge('desig-val'); if(dv)dv.value=k.desig_piece;
+    ssState['desig']={code:k.desig_piece,label:k.desig_piece};
+    var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
+      var dt=db.querySelector('.ss-txt');if(dt)dt.textContent=k.desig_piece;}
+  }
+  if (k.dom_code) {
+    ssSet('dom', k.dom_code, k.dom_lbl);
+
+  }
+  ssSet('ava', k.ava_code, k.ava_lbl);
+  if (k.chassis) {
+    var h = ge('chassis-hint');
+    if (h) { h.textContent = vinHint(k.chassis); h.className = 'hint'+(isValidVIN(k.chassis)?' ok':' err'); }
+    ge('chassis').className = isValidVIN(k.chassis) ? 'ok' : 'invalid';
+  }
+  // Re-rendre le formulaire KULANZ pour le site copié
+  if (k.site) renderKulanzForm(k.site);
+  setType('C'); // Passer en CCR
+  toast('✔ Données Kulanz copiées en CCR !');
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// BROUILLON
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+var draftTimer = null;
+
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(function() {
+    var b = {
+      site: ge('f-site').value, type: ge('f-type').value,
+      chassis: gv('chassis'), kilometrage: gv('kilometrage'),
+      or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
+      conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
+      plainte_client: gv('plainte_client'),
+      emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
+      desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
+      dom_cat: ge('dom-cat') ? ge('dom-cat').value : '',
+      dom_rub: ge('rub-val') ? ge('rub-val').value : '',
+      dom_code: ge('dom-val') ? ge('dom-val').value : '',
+      dom_lbl: ge('dom-lbl') ? ge('dom-lbl').value : '',
+      ava_code: ge('ava-val') ? ge('ava-val').value : '',
+      ava_lbl: ge('ava-lbl') ? ge('ava-lbl').value : ''
+    };
+    var _s=ge('f-site')?ge('f-site').value:'';
+    var _q=(typeof KULANZ_BY_BRAND!=='undefined'&&typeof SITE_BRAND!=='undefined')
+      ?(KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]):[];
+    _q.forEach(function(q){b['k_'+q.name]=gr(q.name)||'';});
+    b.num_tpi=gv('num_tpi')||'';
+    try { var _draftKey = 'gea_draft_' + (_s || 'default');
+      localStorage.setItem(_draftKey, JSON.stringify(b));
+      localStorage.setItem('gea_draft_last', _draftKey); } catch(e) {}
+  }, 700);
+}
+
+function restoreDraft() {
+  try {
+    var _lastKey = localStorage.getItem('gea_draft_last') || 'gea_draft';
+    var s = localStorage.getItem(_lastKey);
+    if (!s) return;
+    var b = JSON.parse(s);
+    if (!b.chassis && !b.or_number) return;
+    var _choix = confirm(
+      '📋 Brouillon trouvé\n\n'
+      + 'Site : '+(b.site||'?')+'  |  N° OR : '+(b.or_number||'?')+'\n'
+      + 'Châssis : '+(b.chassis||'?')+'\n\n'
+      + 'OK      → Restaurer le brouillon\n'
+      + 'Annuler → Vider et repartir à zéro'
+    );
+    if (!_choix) {
+      (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })();
+      return;
+    }
+    // Restaurer le site uniquement si valide
+    if (b.site && SITES.indexOf(b.site) !== -1 && G.role === 'team') {
+      ge('f-site').value = b.site;
+      ge('h-site-name').textContent = b.site;
+      [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
+    }
+    ['chassis','kilometrage','or_number','kvps','conseiller_client','email_usager',
+     'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
+      if (b[n]) sv(n, b[n]);
+    });
+    if (b.date_or && /^\d{4}-\d{2}-\d{2}$/.test(b.date_or)) sv('date_or', b.date_or);
+    if (b.dom_cat) {
+      var ci=ge('dom-cat'); if(ci)ci.value=b.dom_cat;
+      var cb=document.querySelector('.cat-btn[data-cat="'+b.dom_cat+'"]');
+      if(cb)cb.classList.add('active');
+      var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+b.dom_cat;ch.className='hint ok';}
+    }
+    if (b.dom_rub) {
+      var rv=ge('rub-val'); if(rv)rv.value=b.dom_rub;
+      ssState['rub']={code:b.dom_rub,label:b.dom_rub};
+      var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
+        var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=b.dom_rub;}
+    }
+    if (b.desig_piece) {
+      var dv=ge('desig-val'); if(dv)dv.value=b.desig_piece;
+      ssState['desig']={code:b.desig_piece,label:b.desig_piece};
+      var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
+        var dbt=db.querySelector('.ss-txt');if(dbt)dbt.textContent=b.desig_piece;}
+    }
+    if (b.dom_code) {
+      var dv2=ge('dom-val'); if(dv2)dv2.value=b.dom_code;
+      ssState['dom']={code:b.dom_code,label:b.dom_lbl||b.dom_code};
+      var dm=ge('ss-dom-btn'); if(dm){dm.classList.add('filled');
+        var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=b.dom_code;}
+    }
+    // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer
+    var draftSite = (b.site && SITES.indexOf(b.site) !== -1) ? b.site : (ge('f-site')?ge('f-site').value:'');
+    if (draftSite) renderKulanzForm(draftSite);
+    ssSet('ava', b.ava_code, b.ava_lbl);
+    if (b.type === 'CCR') setType('C');
+    if (b.chassis) onChassis(ge('chassis'));
+    // Restaurer les réponses KULANZ
+    if (qs) {
+      var brandQs = typeof KULANZ_BY_BRAND!=='undefined'?KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[]:[];
+      brandQs.forEach(function(q){
+        var val = b['k_'+q.name];
+        if (val) {
+          var radios = document.querySelectorAll('[name="'+q.name+'"]');
+          [].forEach.call(radios, function(r){ r.checked = (r.value===val); });
+        }
+      });
+      if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
+    }
+    checkKulanzNok();
+    toast('✔ Brouillon restauré !');
+  } catch(e) { console.warn('Draft restore error:', e); }
+}
+
+document.addEventListener('input',  function(e) {
+  if (!e.target.closest('#mainForm')) return;
+  saveDraft();
+  // Si l'usager modifie manuellement la désignation pièce, désactiver l'auto-fill
+});
+document.addEventListener('change', function(e) {
+  if (!e.target.closest('#mainForm')) return;
+  saveDraft();
+  if (e.target.name === 'tpi')  toggleTpiField(e.target.value === 'OUI');
+  if (e.target.name === 'cig')  { var ct=ge('cig-taux'); ct.disabled=e.target.value!=='superieur'; if(!ct.disabled) ct.focus(); }
+  // Déclencher checkKulanzNok sur tout radio dans la section KULANZ
+  var kzone = ge('kulanz-questions');
+  if (kzone && kzone.contains(e.target)) checkKulanzNok();
+});
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// COLLECTE DES DONNÉES
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function collectData() {
+  var site    = ge('f-site') ? ge('f-site').value : '';
+  var type    = ge('f-type') ? ge('f-type').value || 'Kulanz' : 'Kulanz';
+  var domCode = ge('dom-val') ? ge('dom-val').value : '';
+  var domLbl  = ge('dom-lbl') ? ge('dom-lbl').value : '';
+  var avaCode = ge('ava-val') ? ge('ava-val').value : '';
+  var avaLbl  = ge('ava-lbl') ? ge('ava-lbl').value : '';
+  var domFull = domCode ? domCode + (domLbl ? ' — '+domLbl : '') : '';
+  var avaFull = avaCode ? avaCode + (avaLbl ? ' — '+avaLbl : '') : '';
+  var fields = [
+    { l:'N° OR',            v:gv('or_number') },
+    { l:'Date OR',          v:gv('date_or') },
+    { l:'KVPS',             v:gv('kvps') },
+    { l:'Nom du demandeur', v:gv('conseiller_client') },
+    { l:'E-mail',           v:gv('email_usager') },
+    { l:'Châssis',          v:gv('chassis') },
+    { l:'Kilométrage',      v:gv('kilometrage') ? gv('kilometrage')+' km' : '' },
+    { l:'Plainte client',   v:gv('plainte_client') },
+    { l:'Catégorie',        v:(ge('dom-cat')?ge('dom-cat').value:'') },
+    { l:'Rubrique',         v:(ge('rub-val')?ge('rub-val').value:'') },
+    { l:'Désignation pièce', v:(ge('desig-val')?ge('desig-val').value:'') },
+    { l:'Code dommage',     v:domFull },
+    { l:'Code avarie',      v:avaFull },
+    { l:'Emplacement',      v:gv('emplacement') },
+    { l:'Référence pièce',  v:gv('ref_piece') },
+  ];
+  if (type === 'Kulanz') {
+    var brand2 = SITE_BRAND[site] || 'VW';
+    var brandQs = KULANZ_BY_BRAND[brand2] || KULANZ_BY_BRAND['VW'];
+    var kFields = [{ l:'N° TPI', v:gv('num_tpi') }];
+    brandQs.forEach(function(q) {
+      kFields.push({ l:q.label, v:gr(q.name) });
+    });
+    fields = fields.concat(kFields);
+  } else {
+    var pcs = []; [].forEach.call(document.querySelectorAll('[name="pieces[]"]:checked'), function(el){ pcs.push(el.value); });
+    fields = fields.concat([
+      { l:'KULANZ effectuée', v:gr('kulanz_done') },
+      { l:'CIG',              v:gr('cig') },
+      { l:'Taux CIG',         v:gv('cig_taux') },
+      { l:'Pièces jointes',   v:pcs.join(' | ') },
+    ]);
+  }
+  fields.push({ l:'Commentaires', v:gv('commentaires') });
+  return { site:site, type:type, fields:fields, domFull:domFull };
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// ENVOYER
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function envoyerFormulaire() {
+  var site  = ge('f-site') ? ge('f-site').value : '';
+  var type  = (ge('f-type') && ge('f-type').value) ? ge('f-type').value : 'Kulanz';
+  var isCCR = (type === 'CCR');
+
+  if (!site) { alert('\u26a0 Veuillez s\u00e9lectionner un site.'); return; }
+  if (!isValidVIN(gv('chassis'))) { alert('\u26a0 Ch\u00e2ssis invalide (17 caract\u00e8res, pas I/O/Q).'); return; }
+  if (!/^\d{6}$/.test(gv('or_number'))) { alert('\u26a0 N\u00b0 OR\u00a0: 6 chiffres requis.'); return; }
+  if (!gv('plainte_client')) { alert('\u26a0 Plainte client obligatoire.'); return; }
+  if (!ge('desig-val') || !ge('desig-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner une d\u00e9signation pi\u00e8ce.'); return; }
+  if (!ge('dom-val') || !ge('dom-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code dommage.'); return; }
+  if (!ge('ava-val') || !ge('ava-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code avarie.'); return; }
+  if (!gv('conseiller_client')) { alert('\u26a0 Le nom du demandeur est obligatoire.'); return; }
+  var email = gv('email_usager');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { alert('\u26a0 E-mail invalide.'); return; }
+  if (isCCR) {
+    var chkE = ge('chk-engagement');
+    if (!chkE || !chkE.checked) {
+      alert('\u26a0 Veuillez cocher la case d\u2019engagement avant d\u2019envoyer.');
+      if (chkE) chkE.focus();
+      return;
+    }
+  }
+
+  var btn = ge('btn-envoyer');
+  if (!btn || btn.disabled) return;
+  var _ct = 'Confirmer l\'envoi ?'
+    + '\nSite : '+site+'  |  N° OR : '+gv('or_number')+'  |  Châssis : '+gv('chassis');
+  if (isCCR) _ct += '\n\n⚠ Après OK : le PDF est généré et les instructions s\'affichent.';
+  if (!confirm(_ct)) return;
+
+  var d = collectData();
+
+  if (isCCR) {
+    btn.disabled = true; btn.textContent = 'Pr\u00e9paration\u2026';
+    try { genererPDF(); } catch(e) { console.warn('PDF:', e); }
+    // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
+    var corps = 'DEMANDE CCR - ' + site + '\n';
+    corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
+    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
+    corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
+    corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
+    corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
+    corps += 'NATURE DOMMAGE:\n';
+    corps += 'Categorie: ' + (ge('dom-cat')?ge('dom-cat').value:'') + '\n';
+    corps += 'Rubrique: ' + (ge('rub-val')?ge('rub-val').value:'') + '\n';
+    corps += 'Designation: ' + (ge('desig-val')?ge('desig-val').value:'') + '\n';
+    corps += 'Code dommage: ' + (ge('dom-val')?ge('dom-val').value:'') + '\n';
+    corps += 'Code avarie: ' + (ge('ava-val')?ge('ava-val').value:'') + '\n';
+    corps += 'Emplacement: ' + (gv('emplacement')||'') + '\n\n';
+    corps += '--- ETAPES ---\n';
+    corps += '1. Joindre le PDF Demande CCR\n';
+    corps += '2. Joindre les documents justificatifs\n';
+    corps += '3. Envoyer depuis Outlook\n';
+    corps += '\nTeam Garantie GEA - VW';
+    var kvps2   = gv('kvps') || site;
+    var subject = 'Demande CCR - ' + kvps2 + ' - ' + site + ' - ' + gv('chassis') + ' - ' + gv('conseiller_client');
+    window._lastSubject = subject; // Stocké pour copierObjetMail()
+    // Limiter a 1000 chars pour garantir compatibilite tous clients mail
+    var corpsLimite = corps.length > 1000
+      ? corps.substring(0, 1000) + '\n[Voir PDF pour details complets]'
+      : corps;
+    var mailto  = 'mailto:teamgarantie@geauto.fr'
+                + '?subject=' + encodeURIComponent(subject)
+                + '&body='    + encodeURIComponent(corpsLimite);
+    // Ouvrir Outlook — méthode universelle Chrome/Firefox/Edge
+    // createElement + click = jamais bloqué car c'est un geste utilisateur direct
+    try {
+      var _a = document.createElement('a');
+      _a.href = mailto;
+      _a.style.display = 'none';
+      document.body.appendChild(_a);
+      // Ouvrir sans envoi automatique
+      window.location.href = mailto;
+      setTimeout(function(){ document.body.removeChild(_a); }, 500);
+    } catch(e) {
+      window.location.href = mailto;
+    }
+    var newD = {
+      id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
+      date: new Date().toLocaleDateString('fr-FR'),
+      site: d.site, type: 'CCR',
+      or: gv('or_number'), chassis: gv('chassis'), code_dommage: d.domFull,
+      desig_piece: ge('desig-val')?ge('desig-val').value:'',
+      rubrique: ge('rub-val')?ge('rub-val').value:'',
+      categorie: ge('dom-cat')?ge('dom-cat').value:'',
+      email_usager: email, conseiller_client: gv('conseiller_client'),
+      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+      statut: 'En attente', commentaire_team: '', commerce: null
+    };
+    if (demandesRef) demandesRef.child('d'+newD.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD).catch(function(e){console.warn('Firebase CCR:',e);});
+    else G.demandes.unshift(newD);
+    try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
+    var _ml2  = window._lastMailto  || '';
+    var _sbj2 = window._lastSubject || '';
+    window._ccrSubject = _sbj2;
+    ge('success-details').innerHTML =
+      '<strong>Site\u00a0:</strong> '+esc(newD.site)
+      +'&nbsp;&nbsp;<strong>N\u00b0 OR\u00a0:</strong> '+esc(newD.or)
+      +'&nbsp;&nbsp;<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(newD.chassis)
+      +'<div style="background:#fff8e1;border:2px solid #f39c12;border-radius:8px;padding:14px;margin-top:10px">'
+      +'<div style="font-weight:700;color:#c0392b;margin-bottom:10px">\u26a0\ufe0f ACTIONS OBLIGATOIRES :</div>'
+      +'\u2705 <strong>1.</strong> PDF g\u00e9n\u00e9r\u00e9 \u2014 sauvegardez-le<br><br>'
+      +'\u2709\ufe0f <strong>2.</strong> Ouvrez Outlook et cr\u00e9ez un nouveau mail avec les informations ci-dessous :'
+      +'<details style="margin-top:6px;font-size:11px">'
+      +'<summary style="cursor:pointer;color:#0078d4;font-weight:700">'
+      +'\u2699\ufe0f Configurer Outlook comme client par d\u00e9faut</summary>'
+      +'<div style="background:#f0f4ff;border:1px solid #c7d3f7;border-radius:4px;padding:10px;margin-top:6px">'
+      +'<strong>M\u00e9thode 1 \u2014 Param\u00e8tres Windows :</strong><br>'
+      +'1. D\u00e9marrer \u2192 <strong>Param\u00e8tres</strong><br>'
+      +'2. <strong>Applications</strong> \u2192 <strong>Applications par d\u00e9faut</strong><br>'
+      +'3. Chercher <strong>\'E-mail\'</strong> \u2192 s\u00e9lectionner <strong>Microsoft Outlook</strong><br>'
+      +'4. Cliquer <strong>D\u00e9finir par d\u00e9faut</strong><br><br>'
+      +'<strong>M\u00e9thode 2 \u2014 Depuis Outlook :</strong><br>'
+      +'1. Ouvrir <strong>Outlook</strong><br>'
+      +'2. <strong>Fichier</strong> \u2192 <strong>Options</strong> \u2192 onglet <strong>G\u00e9n\u00e9ral</strong><br>'
+      +'3. Section <strong>Options de d\u00e9marrage</strong><br>'
+      +'4. Cocher <strong>\'D\u00e9finir Outlook comme programme par d\u00e9faut pour l\'e-mail\'</strong><br>'
+      +'5. Cliquer <strong>OK</strong>'
+      +'</div></details>'
+      +'<br><br><div style="background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:8px;font-size:11px">'
+      +'<strong>\u00c0 :</strong> teamgarantie@geauto.fr<br>'
+      +'<strong>Objet :</strong><br>'
+      +'<input type="text" readonly onclick="this.select()" '
+      +'value="'+esc(_sbj2)+'" '
+      +'style="width:100%;margin-top:4px;padding:6px 8px;font-size:11px;'
+      +'font-family:monospace;border:1px solid #ccc;border-radius:4px;'
+      +'background:#fff;cursor:text;box-sizing:border-box" '
+      +'title="Cliquez pour s\u00e9lectionner, puis Ctrl+C pour copier">'
+      +'<span style="font-size:10px;color:#888;display:block;margin-top:2px">'
+      +'\u261d\ufe0f Cliquez sur le champ puis Ctrl+C pour copier</span></div>'
+      +'<br>\ud83d\udcce <strong>3.</strong> Joindre le <strong>PDF</strong> + documents justificatifs'
+      +'<br>\ud83d\udce4 <strong>4.</strong> Envoyer depuis Outlook</div>';
+    ge('success-overlay').classList.add('open');
+    setTimeout(function(){
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
+    }, 2000);
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Envoi en cours\u2026';
+  var msg = '\u2550'.repeat(40)+'\nDEMANDE '+d.type.toUpperCase()+' \u2014 '+d.site+'\n'+'\u2550'.repeat(40)+'\n\n';
+  d.fields.filter(function(f){ return f.v; }).forEach(function(f){ msg += f.l+' : '+f.v+'\n'; });
+  msg += '\n'+'\u2500'.repeat(40)+'\nTeam Garantie GEA \u2013 VW';
+  fetch('https://api.web3forms.com/submit', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      access_key: WEB3_KEY,
+      subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
+      message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (!res.success) throw new Error('web3forms error');
+    var newD2 = {
+      id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
+      date: new Date().toLocaleDateString('fr-FR'),
+      site: d.site, type: d.type, or: gv('or_number'), chassis: gv('chassis'),
+      code_dommage: d.domFull,
+      desig_piece: ge('desig-val')?ge('desig-val').value:'',
+      rubrique: ge('rub-val')?ge('rub-val').value:'',
+      categorie: ge('dom-cat')?ge('dom-cat').value:'',
+      email_usager: email, conseiller_client: gv('conseiller_client'),
+      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+      statut: 'En attente', commentaire_team: '', commerce: null
+    };
+    if (demandesRef) {
+    if (demandesRef) return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
+    return _pjK2.then(function(_u2){if(_u2.length)newD2.pieces_jointes=_u2;
+      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
+    }).catch(function(e){console.warn('PJ Kulanz:',e);
+      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
+    });}
+    G.demandes.unshift(newD2); return newD2;
+  })
+  .then(function(newD2){
+    try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
+    ge('success-details').innerHTML =
+      '<strong>Site\u00a0:</strong> '+esc(newD2.site)+'<br>'+
+      '<strong>Type\u00a0:</strong> '+esc(newD2.type)+'<br>'+
+      '<strong>N\u00b0 OR\u00a0:</strong> '+esc(newD2.or)+'<br>'+
+      '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(newD2.chassis)+'<br>'+
+      '<strong>E-mail\u00a0:</strong> '+esc(newD2.email_usager);
+    ge('success-overlay').classList.add('open');
+  })
+  .catch(function(err){ console.error(err); toast('\u274c Erreur \u2013 r\u00e9essayez.'); })
+  .finally(function(){
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
+  });
+}
+
+function nouvelleDemande() {
+  ge('success-overlay').classList.remove('open');
+  ge('mainForm').reset();
+  ge('f-type').value = 'Kulanz';
+  ssReset('dom'); ssReset('ava');
+  var ch = ge('chassis-hint'); if(ch) { ch.textContent='0 / 17 caractères'; ch.className='hint'; }
+  var oh = ge('or-hint'); if(oh) { oh.textContent='0 / 6 chiffres'; oh.className='hint'; }
+  ge('chassis').className = '';
+  ge('or-num').className  = '';
+  setType('K');
+  resetCat();
+  var _dci=ge('dom-cat'); if(_dci) _dci.value='';
+  var kz=ge('kulanz-questions'); if(kz){[].forEach.call(kz.querySelectorAll('input[type=radio]'),function(r){r.checked=false;});}
+  toggleTpiField(false);
+  var _ce=ge('chk-engagement'); if(_ce) _ce.checked=false;
+  var _cew=ge('ccr-engagement-wrap'); if(_cew) _cew.style.display='none';
+  var vw=ge('vendu-wrapper'); if(vw)vw.style.display='none';
+  var va=ge('vendu-alert'); if(va){va.style.display='none';va.innerHTML='';}
+  var kna=ge('kulanz-nok-alert'); if(kna){kna.classList.remove('show');kna.innerHTML='';}  
+  if(ge('desig-val')){ge('desig-val').value='';ge('desig-val').dataset.manual='';}
+  if(ge('rub-val'))ge('rub-val').value='';
+  // Réinitialiser cascade via resetBelow
+  resetBelow('cat');
+  enableAllDropdowns();
+  if (G.role === 'usager') {
+    ge('f-site').value = G.site;
+    ge('kvps').value = KVPS_MAP[G.site]||'';
+    ge('kvps').readOnly = true;
+    ge('site-display').value = G.site;
+  } else {
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(b) { b.classList.remove('active'); });
+    ge('f-site').value = '';
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// PDF
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function genererPDF() {
+  var site = ge('f-site').value;
+  if (!site) { alert('⚠ Veuillez sélectionner un site.'); return; }
+  if (!/^\d{6}$/.test(gv('or_number'))) { alert('⚠ N° OR requis (6 chiffres).'); return; }
+  if (!window.jspdf) { alert('⚠ Bibliothèque PDF non chargée.'); return; }
+  var btn = ge('btn-pdf');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true; btn.textContent = 'Génération…';
+  try {
+    var d = collectData();
+    var orNum = gv('or_number');
+    var kvps  = gv('kvps');
+    var now   = new Date().toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'});
+    var title = '['+d.type.toUpperCase()+'] '+d.site+(kvps?' — '+kvps:'')+(ge('dom-val').value?' — '+ge('dom-val').value:'');
+    var fname = title.replace(/[^a-zA-Z0-9_\-.[\]]/g,'_')+'_OR'+orNum+'.pdf';
+    var doc = new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    var W=210, ml=14, uw=W-ml*2, y=14;
+    doc.setFillColor(26,26,46); doc.rect(ml,y,uw,17,'F');
+    doc.setTextColor(212,174,82); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(doc.splitTextToSize(title,uw-6),ml+3,y+6);
+    doc.setTextColor(180,180,180); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('OR: '+orNum+'  |  '+now+'  |  teamgarantie@geauto.fr',ml+3,y+14);
+    y += 22;
+    doc.setFillColor(240,237,232); doc.rect(ml,y,uw,7,'F');
+    doc.setTextColor(26,26,46); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('Détails de la demande',ml+3,y+5); y+=9;
+    var cL=70, cV=uw-cL;
+    d.fields.filter(function(f){return f.v&&f.v.trim();}).forEach(function(f,i) {
+      var lines = doc.splitTextToSize(f.v, cV-4);
+      var rh = Math.max(7, lines.length*5+2);
+      if(y+rh>282){doc.addPage();y=14;}
+      doc.setFillColor(i%2===0?255:247, i%2===0?255:246, i%2===0?255:242);
+      doc.rect(ml,y,uw,rh,'F');
+      doc.setDrawColor(221,221,221); doc.rect(ml,y,cL,rh,'S'); doc.rect(ml+cL,y,cV,rh,'S');
+      doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80); doc.setFontSize(8.5);
+      doc.text(f.l,ml+3,y+5);
+      doc.setFont('helvetica','normal'); doc.setTextColor(26,26,46); doc.setFontSize(9);
+      doc.text(lines,ml+cL+3,y+5); y+=rh;
+    });
+    y+=5; doc.setDrawColor(200,200,200); doc.line(ml,y,ml+uw,y);
+    doc.setFontSize(7); doc.setTextColor(160,160,160);
+    doc.text('Team Garantie GEA – VW — '+now, W/2, y+4, {align:'center'});
+    doc.save(fname);
+    toast('✔ PDF enregistré : '+fname);
+  } catch(e) {
+    toast('❌ Erreur PDF : '+e.message); console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Enregistrer en PDF';
+  }
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// HISTORIQUE
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function renderHisto() {
+  // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
+  var fS  = G.role==='usager' ? G.site : ge('f-site').value;
+  var fT  = ge('f-type-sel')  ? ge('f-type-sel').value  : '';
+  var fSt = ge('f-stat-sel')  ? ge('f-stat-sel').value  : '';
+
+  var scope = fS
+    ? G.demandes.filter(function(d) { return d.site===fS; })
+    : G.demandes;
+
+  var el = function(id,val) { var e=ge(id); if(e) e.textContent=val; };
+  el('s-total', scope.length);
+  el('s-wait',  scope.filter(function(d){return d.statut==='En attente';}).length);
+  el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
+  el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
+
+  var filtered = G.demandes.filter(function(d) {
+    return (!fS||d.site===fS) && (!fT||d.type===fT) && (!fSt||d.statut===fSt);
+  });
+
+  var _bv=ge('btn-vider-histo'); if(_bv) _bv.style.display=(G.role==='team'?'':'none');
+  var tbody = ge('histo-body');
+  var empty = ge('histo-empty');
+  if (!tbody) return;
+  if (!filtered.length) { tbody.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if (empty) empty.style.display='none';
+
+  var BADGE = {
+    'En attente':'b-wait','Traitée':'b-ok','Traitée sans participation':'b-no','Complément requis':'b-comp'
+  };
+  var ICON = {'En attente':'🟡','Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄'};
+
+  tbody.innerHTML = filtered.map(function(d) {
+    var bc   = BADGE[d.statut] || 'b-wait';
+    var ic   = ICON[d.statut]  || '🟡';
+    var pec  = '—';
+    if (d.statut==='Traitée' && d.commerce) {
+      var c=d.commerce, pts=[];
+      if(c.mo_de)  pts.push('<span>MO: '+esc(c.mo_de)+'%</span>');
+      if(c.pi_de)  pts.push('<span>Pièces: '+esc(c.pi_de)+'%</span>');
+      if(c.moe_de) pts.push('<span>MO ext.: '+esc(c.moe_de)+'%</span>');
+      if(c.pe_de)  pts.push('<span>Pièces ext.: '+esc(c.pe_de)+'%</span>');
+      if(pts.length) pec='<div style="font-size:11px;line-height:1.7">'+pts.join('')+'</div>';
+    }
+    var action = G.role==='team'
+      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" onclick="openSPFromBtn(this)">Valider</button>'
+      : '—';
+    return '<tr>'+
+      '<td>'+esc(d.date||'')+'</td>'+
+      '<td style="font-weight:500">'+esc(d.site||'')+'</td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:var(--gold)">'+esc(d.type||'')+'</span></td>'+
+      '<td style="font-family:monospace">'+esc(d.or||'')+'</td>'+
+      '<td style="font-family:monospace;font-size:11px">'+esc(d.chassis||'')+'</td>'+
+      '<td style="font-size:11px">'+esc(d.code_dommage||'')+'</td>'+
+      '<td><span class="badge '+bc+'">'+ic+' '+esc(d.statut||'')+'</span></td>'+
+      '<td>'+pec+'</td>'+
+      '<td style="font-size:11px;color:#666;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.commentaire_team||'')+'">'+esc(d.commentaire_team||'—')+'</td>'+
+      '<td>'+action+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function viderHistorique() {
+  if (G.role !== 'team') { toast('⚠ Réservé à TeamGarantie.'); return; }
+  var m = ge('vider-modal');
+  if (!m) return;
+  // Reset à l'étape 1
+  var s1 = ge('vm-step1'); if(s1) { s1.classList.add('active'); }
+  var s2 = ge('vm-step2'); if(s2) { s2.classList.remove('active'); }
+  var pe = ge('vider-pwd-err'); if(pe) pe.style.display = 'none';
+  var pi = ge('vider-pwd'); if(pi) pi.value = '';
+  var ob = ge('vider-ok-btn'); if(ob) ob.disabled = false;
+  var _sl=ge('vm-site-label');
+  if(_sl){
+    var _fs2=ge('f-site')?ge('f-site').value:'';
+    _sl.textContent=_fs2?'Site concerné : '+_fs2:'⚠ Sélectionnez un site';
+    _sl.style.color=_fs2?'var(--gold)':'#c0392b';
+  }
+  m.classList.add('open');
+}
+
+function closeViderModal() {
+  var m = ge('vider-modal'); if(m) m.classList.remove('open');
+  var pi = ge('vider-pwd'); if(pi) pi.value = '';
+  var pe = ge('vider-pwd-err'); if(pe) pe.style.display = 'none';
+  var ob = ge('vider-ok-btn'); if(ob) ob.disabled = false;
+}
+
+function viderStep2() {
+  // Passer à l'étape mot de passe
+  var s1 = ge('vm-step1'); if(s1) s1.classList.remove('active');
+  var s2 = ge('vm-step2'); if(s2) s2.classList.add('active');
+  setTimeout(function() { var pi = ge('vider-pwd'); if(pi) pi.focus(); }, 100);
+}
+
+function viderConfirm() {
+  var ob = ge('vider-ok-btn');
+  if (ob && ob.disabled) return;
+  var pi = ge('vider-pwd');
+  if (!pi || pi.value !== MOT_DE_PASSE) {
+    var pe = ge('vider-pwd-err'); if(pe) pe.style.display = 'block';
+    if(pi) pi.focus();
+    return;
+  }
+  if(ob) ob.disabled = true;
+  var pe = ge('vider-pwd-err'); if(pe) pe.style.display = 'none';
+  if (demandesRef) {
+    var _fs=ge('f-site')?ge('f-site').value:'';
+    if(!_fs){toast('⚠ Sélectionnez un site à vider.');closeViderModal();return;}
+    var _td=G.demandes.filter(function(d){return d.site===_fs;});
+    if(!_td.length){toast('✔ Aucune demande pour '+_fs+'.');closeViderModal();return;}
+    Promise.all(_td.map(function(d){
+      return demandesRef.child('d'+String(d.id).replace(/[^a-zA-Z0-9]/g,'')).remove();
+    })).then(function(){
+      G.demandes=G.demandes.filter(function(d){return d.site!==_fs;});
+      closeViderModal();renderHisto();renderDash();
+      toast('✔ '+_td.length+' demande(s) de '+_fs+' supprimée(s).');
+      })
+      .catch(function() {
+        closeViderModal();
+        toast('❌ Erreur lors de la suppression.');
+      });
+  } else {
+    G.demandes = [];
+    closeViderModal();
+    renderHisto();
+    toast('🗑 Historique local supprimé.');
+  }
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// DASHBOARD TEAM
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function renderDash() {
+  var grid = ge('dash-grid');
+  if (!grid || G.role !== 'team') return;
+  if (!G.demandes) G.demandes = [];
+  var totalWait = 0;
+  var html = '';
+  var curFilter = ge('f-site').value || '';
+  SITES.forEach(function(site) {
+    var sd    = G.demandes.filter(function(d) { return d.site===site; });
+    var total = sd.length;
+    var wait  = sd.filter(function(d) { return d.statut==='En attente'; }).length;
+    var valid = sd.filter(function(d) { return d.statut==='Traitée'; }).length;
+    totalWait += wait;
+    var cls = 'd-card' + (wait>0?' pending':'') + (curFilter===site?' sel':'');
+    // Utiliser data-site pour éviter les problèmes de quotes
+    html += '<div class="'+cls+'" data-site="'+esc(site)+'" onclick="dashClick(this)">'+
+      '<div class="d-name">'+esc(site)+'</div>'+
+      '<div class="d-nums">'+
+        '<div class="d-num"><span class="d-val dv-total">'+total+'</span><span class="d-lbl">Total</span></div>'+
+        '<div class="d-num"><span class="d-val dv-wait">'+wait+'</span><span class="d-lbl">Attente</span></div>'+
+        '<div class="d-num"><span class="d-val dv-ok">'+valid+'</span><span class="d-lbl">Validées</span></div>'+
+      '</div>'+
+      '<div class="d-dot'+(wait>0?' w':total>0?' ok':'')+'"></div>'+
+    '</div>';
+  });
+  grid.innerHTML = html;
+  var alert = ge('h-alert');
+  var atxt  = ge('h-alert-txt');
+  if (alert) {
+    if (totalWait > 0) {
+      alert.classList.add('on');
+      if (atxt) atxt.textContent = totalWait+' demande'+(totalWait>1?'s':'')+' en attente';
+    } else {
+      alert.classList.remove('on');
+    }
+  }
+}
+
+function dashClick(el) {
+  var site = el.getAttribute('data-site');
+  // Toggle: si déjà sélectionné, déselectionner
+  var curSite = ge('f-site').value;
+  var newSite = (curSite === site) ? '' : site;
+  // Mettre à jour site actif (pour TeamGarantie, G.site reste '')
+  ge('f-site').value = newSite;
+  ge('h-site-name').textContent = newSite || 'Tous les sites';
+  // Synchroniser site-bar boutons
+  [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
+    b.classList.toggle('active', b.textContent.trim() === newSite);
+  });
+  // Basculer sur l'historique
+  [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
+  [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
+  ge('page-histo').classList.add('active');
+  ge('tab-histo').classList.add('active');
+  ge('type-bar').style.display = 'none';
+  renderHisto();
+  renderDash();
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// PANNEAU VALIDATION
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function openSPFromBtn(btn) {
+  var id = btn.getAttribute('data-id');
+  openSP(id);
+}
+
+function openSP(id) {
+  G.activeId = id;
+  var d = G.demandes.find(function(x) { return x.id == id; });
+  if (!d) return;
+  var setText = function(elId, val) { var e=ge(elId); if(e) e.textContent=val||'—'; };
+  setText('sp-sub',d.type+' — OR '+d.or+' — '+d.date);
+  setText('sp-sub',     d.type+' — OR '+d.or+' — '+d.date);
+  setText('sp-site',    d.site);
+  setText('sp-type',    d.type);
+  setText('sp-or',      d.or);
+  setText('sp-chassis', d.chassis);
+  setText('sp-dom',     d.code_dommage);
+  setText('sp-date',    d.date);
+  var stat = ge('sp-statut');
+  if (stat) stat.value = d.statut || 'En attente';
+  var cmt = ge('sp-comment');
+  if (cmt) cmt.value = d.commentaire_team || '';
+  var pwd = ge('sp-pwd');
+  if (pwd) pwd.value = '';
+  var err = ge('sp-pwd-err');
+  if (err) err.style.display = 'none';
+  var c = d.commerce || {};
+  ['mo','pi','moe','pe'].forEach(function(k) {
+    var el = ge('c-'+k); if (el) el.value = c[k+'_de'] || '';
+  });
+  var ext = ge('c-type-ext');
+  if (ext) ext.value = c.type_ext || '';
+  var okBtn = ge('sp-ok-btn');
+  if (okBtn) okBtn.disabled = false;
+  onStatutChange();
+  var spOv = ge('sp-overlay'); if(spOv) spOv.classList.add('open');
+  var spPn = ge('side-panel'); if(spPn) spPn.classList.add('open');
+  setTimeout(function() { var p=ge('sp-pwd'); if(p) p.focus(); }, 350);
+}
+
+function closeSP() {
+  var spOv2 = ge('sp-overlay'); if(spOv2) spOv2.classList.remove('open');
+  var spPn2 = ge('side-panel'); if(spPn2) spPn2.classList.remove('open');
+  G.activeId = null;
+  var okBtn = ge('sp-ok-btn'); if (okBtn) okBtn.disabled = false;
+}
+
+function onStatutChange() {
+  var s = ge('sp-statut');
+  var c = ge('sp-commerce');
+  if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
+}
+
+function validerSP() {
+  var okBtn = ge('sp-ok-btn');
+  if (okBtn && okBtn.disabled) return;
+  // Vérifier que l'utilisateur est connecté via Firebase Auth comme TeamGarantie
+  var currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!currentUser || !isTeamEmail(currentUser.email)) {
+    ge('sp-pwd-err').textContent = 'Session expirée. Reconnectez-vous.';
+    ge('sp-pwd-err').style.display = 'block';
+    return;
+  }
+  ge('sp-pwd-err').style.display = 'none';
+  if (okBtn) okBtn.disabled = true;
+
+  var statut     = ge('sp-statut').value;
+  var commentaire = ge('sp-comment').value.trim();
+  var commerce = {
+    mo_de:  ge('c-mo')  ? ge('c-mo').value  : '',
+    pi_de:  ge('c-pi')  ? ge('c-pi').value  : '',
+    moe_de: ge('c-moe') ? ge('c-moe').value : '',
+    pe_de:  ge('c-pe')  ? ge('c-pe').value  : '',
+    type_ext: ge('c-type-ext') ? ge('c-type-ext').value.trim() : ''
+  };
+
+  var d = G.demandes.find(function(x) { return x.id == G.activeId; });
+  if (!d) { closeSP(); return; }
+
+  var update = {
+    statut: statut,
+    commentaire_team: commentaire,
+    commerce: statut==='Traitée' ? commerce : (d.commerce||null)
+  };
+
+  var doSave = function() {
+    if (demandesRef) {
+      var key = 'd'+String(d.id).replace(/[^a-zA-Z0-9]/g,'');
+      return demandesRef.child(key).update(update).catch(function(e){console.warn('Firebase update:',e);});
+    } else {
+      var idx = G.demandes.findIndex(function(x) { return x.id == G.activeId; });
+      if (idx !== -1) Object.assign(G.demandes[idx], update);
+      return Promise.resolve();
+    }
+  };
+
+  doSave()
+    .then(function() {
+      closeSP(); renderHisto(); renderDash();
+      toast('✔ Statut mis à jour : '+statut);
+      // Envoi mail + PDF Kulanz si statut final
+      if (statut !== 'En attente') {
+        envoyerMailKulanz(d, statut, commentaire, commerce);
+      }
+    })
+    .catch(function(err) {
+      console.error(err);
+      toast('❌ Erreur Firebase.');
+      if (okBtn) okBtn.disabled = false;
+    });
+}
+
+
+// ═══════════════════════════════════════════════════════
+// ENVOI MAIL KULANZ — avec PDF + sujet structuré
+// ═══════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+
+// Upload vers Firebase Storage et retourner les URLs
+function envoyerMailKulanz(d, statut, commentaire, commerce) {
+  if (!d) return;
+
+  // Sujet : Demande Kulanz_VIN_KVPS
+  var kvps = d.kvps || KVPS_MAP[d.site] || '';
+  var sujet = 'Demande Kulanz_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
+
+  // Corps du mail
+  var sep  = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  var sep2 = '────────────────────────────────────────────────────';
+  var statIcon = statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
+  var corps = sep + '\n';
+  corps += '🔧  DEMANDE KULANZ — ' + (d.site||'').toUpperCase() + '\n';
+  corps += sep + '\n\n';
+  corps += '📋  IDENTIFICATION\n' + sep2 + '\n';
+  corps += '  N° OR          : ' + (d.or_number||'—') + '\n';
+  corps += '  Date OR        : ' + (d.date_or||'—') + '\n';
+  corps += '  Châssis        : ' + (d.chassis||'—') + '\n';
+  corps += '  Kilométrage    : ' + (d.kilometrage||'—') + ' km\n';
+  corps += '  KVPS           : ' + (kvps||'—') + '\n';
+  corps += '  Conseiller     : ' + (d.conseiller_client||'—') + '\n';
+  corps += '  E-mail         : ' + (d.email_usager||'—') + '\n\n';
+  corps += '🔩  DOMMAGE\n' + sep2 + '\n';
+  corps += '  Catégorie      : ' + (d.categorie||'—') + '\n';
+  corps += '  Rubrique       : ' + (d.rubrique||'—') + '\n';
+  corps += '  Désignation    : ' + (d.designation||'—') + '\n';
+  corps += '  Code dommage   : ' + (d.code_dom||'—') + '\n';
+  corps += '  Code avarie    : ' + (d.code_ava||'—') + '\n';
+  if (d.plainte_client) corps += '  Plainte client : ' + d.plainte_client + '\n';
+  corps += '\n' + statIcon + '  STATUT : ' + statut.toUpperCase() + '\n' + sep2 + '\n';
+  if (commentaire) corps += '  Commentaire    : ' + commentaire + '\n';
+  if (statut === 'Traitée' && commerce) {
+    corps += '\n💶  PARTICIPATION COMMERCIALE\n' + sep2 + '\n';
+    if (commerce.mo_de)  corps += '  MO             : ' + commerce.mo_de + ' %\n';
+    if (commerce.pi_de)  corps += '  Pièces         : ' + commerce.pi_de + ' %\n';
+    if (commerce.moe_de) corps += '  MO Ext         : ' + commerce.moe_de + ' %\n';
+    if (commerce.pe_de)  corps += '  Pièces Ext     : ' + commerce.pe_de + ' %\n';
+  }
+  corps += '\n' + sep + '\n';
+  corps += 'Team Garantie GEA – VW  |  Alsace  |  teamgarantie@geauto.fr\n';
+  corps += sep + '\n';
+
+  // Ouvrir Outlook avec l'email pré-rempli
+  var dest = d.email_usager || d.email || '';
+  if (!dest) dest = 'teamgarantie@geauto.fr';
+  var corpsEnc = encodeURIComponent(corps.substring(0, 1500));
+  var sujetEnc = encodeURIComponent(sujet);
+  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
+
+  // Ouvrir Outlook sans envoi automatique
+  window.location.href = mailto;
+
+  toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
+}
+
+
+function sendStatusMail(d, statut, commentaire, commerce) {
+  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
+  var ic = icons[statut] || '🔔';
+  var sep = Array(41).join('-');
+  var pecMsg = '';
+  if (statut==='Traitée' && commerce) {
+    pecMsg = '\n\nPrise en charge accordée :\n';
+    if(commerce.mo_de)  pecMsg += '- Main d oeuvre : '+commerce.mo_de+'%\n';
+    if(commerce.pi_de)  pecMsg += '- Pieces        : '+commerce.pi_de+'%\n';
+    if(commerce.moe_de) pecMsg += '- MO ext.       : '+commerce.moe_de+'%\n';
+    if(commerce.pe_de)  pecMsg += '- Pieces ext.   : '+commerce.pe_de+'%\n';
+    if(commerce.type_ext) pecMsg += '- Type ext.     : '+commerce.type_ext+'\n';
+  }
+  var body = 'Bonjour'+(d.conseiller_client?' '+d.conseiller_client:'')+',\n\n'
+    +'Votre demande '+d.type+' a ete traitee.\n\n'
+    +sep+'\nStatut : '+ic+' '+statut
+    +'\nSite : '+d.site
+    +'\nN OR : '+d.or
+    +'\nChassis : '+d.chassis
+    +(commentaire?'\nCommentaire : '+commentaire:'')
+    +pecMsg+'\n'+sep+'\n\n'
+    +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
+     :statut==='Traitée sans participation'?'Veuillez contacter la TeamGarantie.\n'
+     :'Un complement de dossier est necessaire.\n')
+    +'\nCordialement,\nTeam Garantie GEA - VW';
+  fetch('https://api.web3forms.com/submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      access_key: WEB3_KEY,
+      subject: ic+' Demande '+d.type+' '+statut+' - OR '+d.or,
+      message: body,
+      from_name: 'Team Garantie GEA - VW',
+      replyto: 'teamgarantie@geauto.fr'
+    })
+  })
+  .then(function() { toast('Email envoye.'); })
+  .catch(function() { toast('Statut OK mais email non envoye.'); });
+}
+
+
+
+
+// ═══════════════════════════════════════════════════════════
+// SÉLECTION CATÉGORIE DOMMAGE
+// ═══════════════════════════════════════════════════════════
+
+function resetCascadeBelow(from) { resetBelow(from); }
+function resetBelow(from) {
+  // from: 'cat' -> efface rub+desig+dom
+  //       'rub' -> efface desig+dom (PAS rub)
+  //       'desig' -> efface dom seulement
+  var levels = ['rub', 'desig', 'dom'];
+  var start  = (from === 'cat') ? 0
+             : (from === 'rub') ? 1
+             : (from === 'desig') ? 2
+             : 0;
+  var ph = {
+    rub:   'Rechercher une rubrique…',
+    desig: 'Rechercher une désignation…',
+    dom:   'Rechercher par code ou libéllé…'
+  };
+  for (var i = start; i < levels.length; i++) {
+    var k = levels[i];
+    ssState[k] = null;
+    var valEl = ge(k + '-val');
+    if (valEl) { valEl.value = ''; if (valEl.dataset) valEl.dataset.manual = ''; }
+    var btnEl = ge('ss-' + k + '-btn');
+    if (btnEl) {
+      btnEl.classList.remove('filled');
+      var t = btnEl.querySelector('.ss-txt');
+      if (t) t.textContent = ph[k] || 'Sélectionner…';
+    }
+    var hEl = ge('ss-' + k + '-hint');
+    if (hEl) { hEl.textContent = ''; hEl.className = 'hint'; }
+  }
+  // Effacer rub-val seulement si on repart de cat
+  if (from === 'cat') {
+    var rv = ge('rub-val'); if (rv) rv.value = '';
+  }
+}
+
+function selectCat(btn) {
+  [].forEach.call(document.querySelectorAll('.cat-btn'), function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var cat = btn ? btn.getAttribute('data-cat') : '';
+  var ci = ge('dom-cat'); if (ci) ci.value = cat;
+  var mr = ge('cat-manual-row'); if (mr) mr.classList.remove('show');
+  var hint = ge('cat-hint');
+  if (hint) { hint.textContent = '✔ ' + cat; hint.className = 'hint ok'; }
+  // Reset toute la cascade sous catégorie
+  resetBelow('cat');
+  toast('✔ ' + cat);
+}
+
+
+function selectCatManual() {
+  document.querySelectorAll('.cat-btn:not(.manual)').forEach(function(b){b.classList.remove('active');});
+  var mr=ge('cat-manual-row'); if(mr)mr.classList.add('show');
+  var mi=ge('cat-manual-inp'); if(mi){mi.value='';mi.focus();}
+  var ci=ge('dom-cat'); if(ci)ci.value='';
+  // Reset cascade et activer rubrique (liste complète sans filtre)
+  ssState['rub']=null; var rv=ge('rub-val'); if(rv)rv.value='';
+  ssResetDesig();
+  var rubBtn=ge('ss-rub-btn');
+  if(rubBtn){
+    rubBtn.disabled=false; rubBtn.classList.remove('filled');
+    var t=rubBtn.querySelector('.ss-txt');
+    if(t)t.textContent='🔍 Sélectionner une rubrique…';
+  }
+  ssRender('rub','');
+}
+
+function catManualConfirm() {
+  var mi = ge('cat-manual-inp');
+  if(!mi || !mi.value.trim()){ toast('Saisissez une catégorie.'); return; }
+  var cat = mi.value.trim();
+  var ci = ge('dom-cat'); if(ci) ci.value = cat;
+  var hint = ge('cat-hint');
+  if(hint){ hint.textContent = '✔ Catégorie libre: '+cat; hint.className = 'hint ok'; }
+  var mr = ge('cat-manual-row'); if(mr) mr.classList.remove('show');
+  [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){ b.classList.remove('active'); });
+  var manBtn = document.querySelector('.cat-btn.manual'); if(manBtn) manBtn.classList.add('active');
+  resetCascadeBelow('cat');
+  toast('✔ Catégorie "'+cat+'" définie');
+}
+
+
+
+function resetCat() {
+  [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){ b.classList.remove('active'); });
+  var ci = ge('dom-cat'); if(ci) ci.value = '';
+  var mr = ge('cat-manual-row'); if(mr) mr.classList.remove('show');
+  var hint = ge('cat-hint'); if(hint){ hint.textContent=''; hint.className='hint'; }
+  resetCascadeBelow('cat');
+}
+
+
+
+// ═══════════════════════════════════════════════════════════
+// SAISIE MANUELLE CODES DOM/AVA
+// ═══════════════════════════════════════════════════════════
+function ssManualInput(key, val) {
+  var btn = ge('ss-'+key+'-btn');
+  if (btn) btn.classList.toggle('filled', val.trim().length > 0);
+}
+
+
+function ssManualConfirmDesig() {
+  var inp = ge('ss-desig-manual');
+  if (!inp || !inp.value.trim()) { toast('Saisissez une désignation.'); return; }
+  var raw = inp.value.trim();
+  var rubVal = ge('rub-val') ? ge('rub-val').value : '';
+  var k = rubVal + '|||' + raw;
+  var codes = RUB_LABEL_CODES[k] || [];
+  if (!codes.length) {
+    // Chercher dans toutes les rubriques
+    Object.keys(RUB_LABEL_CODES).forEach(function(k2){
+      if(k2.split('|||')[1].toLowerCase()===raw.toLowerCase()) codes=codes.concat(RUB_LABEL_CODES[k2]);
+    });
+  }
+  var dv=ge('desig-val'); if(dv){dv.value=raw;dv.dataset.manual='true';}
+  ssState['desig']={code:raw,label:raw};
+  var btn=ge('ss-desig-btn');
+  if(btn){btn.classList.add('filled');var t=btn.querySelector('.ss-txt');if(t)t.textContent=raw;}
+  var hint=ge('ss-desig-hint'); if(hint){hint.textContent='✔ '+raw;hint.className='hint ok';}
+  var domBtn=ge('ss-dom-btn');
+  if(domBtn){domBtn.disabled=false;
+    var t2=domBtn.querySelector('.ss-txt');
+    if(t2)t2.textContent=codes.length===1?codes[0]:'🔍 '+codes.length+' code(s)…';}
+  ssReset('dom'); ssRender('dom','');
+  if(codes.length===1){setTimeout(function(){ssPick('dom',codes[0],raw);},50);}
+  inp.value=''; ssClose(); saveDraft();
+  toast('✔ "'+raw+'" — '+codes.length+' code(s).');
+}
+
+function ssManualConfirmRub() {
+  var inp = ge('ss-rub-manual');
+  if (!inp || !inp.value.trim()) { toast('Saisissez une rubrique.'); return; }
+  var raw = inp.value.trim();
+  var rv = ge('rub-val'); if(rv) rv.value = raw;
+  ssState['rub'] = {code:raw, label:raw};
+  var btn=ge('ss-rub-btn');
+  if(btn){btn.classList.add('filled');var t=btn.querySelector('.ss-txt');if(t)t.textContent=raw;}
+  var hint=ge('ss-rub-hint'); if(hint){hint.textContent='✔ '+raw;hint.className='hint ok';}
+  var dBtn=ge('ss-desig-btn');
+  if(dBtn){dBtn.disabled=false;var t2=dBtn.querySelector('.ss-txt');
+    if(t2)t2.textContent='🔍 Sélectionner une désignation…';}
+  ssResetDesig();
+  ssState['desig']=null; ssRender('desig','');
+  inp.value=''; ssClose(); saveDraft();
+  toast('✔ Rubrique "'+raw+'" définie.');
+}
+function ssManualConfirm(key) {
+  var inp = ge('ss-'+key+'-manual');
+  if (!inp) return;
+  var raw = inp.value.trim();
+  if (!raw) { toast('Saisissez un code.'); return; }
+  // Valider: au moins 1 char, commence par lettre ou chiffre
+  if (!/^[A-Za-z0-9].{0,19}$/.test(raw)) {
+    toast('Code invalide — commencez par une lettre ou un chiffre.');
+    return;
+  }
+  // Chercher un libellé dans la liste si code connu
+  var items = ssData(key);
+  var found = items.find(function(it) {
+    return it.code.toLowerCase() === raw.toLowerCase();
+  });
+  var label = found ? found.label : '(saisie manuelle)';
+  ssPick(key, raw.toUpperCase(), label);
+  inp.value = '';
+  toast('✔ Code ' + raw.toUpperCase() + ' enregistré.');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// FORMULAIRE KULANZ DYNAMIQUE
+// ═══════════════════════════════════════════════════════════
+
+function toggleTpiField(show) {
+  var f = ge('tpi-num-field'); if(f) f.style.display = show ? 'flex' : 'none';
+}
+
+
+
+function toggleVenduClient(val) {
+  var w = ge('vendu-wrapper');
+  if (!w) return;
+  if (val === 'NON') {
+    w.style.display = 'block';
+  } else {
+    w.style.display = 'none';
+    // Reset les radios vendu_client
+    var radios = document.querySelectorAll('[name="vendu_client"]');
+    radios.forEach(function(r){ r.checked = false; });
+    hideVenduAlert();
+  }
+}
+
+function showVenduAlert() {
+  var el = ge('vendu-alert');
+  if (!el) return;
+  var site  = ge('f-site') ? ge('f-site').value : '';
+  var brand = SITE_BRAND[site] || 'VW';
+  var brandKey = brand.toLowerCase();
+  if (brandKey.indexOf('skoda') >= 0)      brandKey = 'skoda';
+  else if (brandKey.indexOf('audi') >= 0)  brandKey = 'audi';
+  else if (brandKey.indexOf('seat') >= 0)  brandKey = 'seat';
+  else                                      brandKey = 'vw';
+
+  var msgs = {
+    vw:    "Le dernier entretien doit être vendu au client ET réalisé en même temps que la réparation pour maintenir l'éligibilité Kulanz VW.",
+    audi:  "Le dernier entretien doit être vendu au client ET réalisé en même temps que la réparation. Il devra être réalisé chez Audi pour bénéficier des participations commerciales constructeur.",
+    seat:  "Le dernier entretien doit être vendu au client ET réalisé en même temps que la réparation. Il devra être réalisé chez SEAT ou CUPRA pour bénéficier des participations commerciales.",
+    skoda: "Le dernier entretien doit être vendu au client ET réalisé en même temps que la réparation selon les préconisations constructeur Skoda."
+  };
+  var msg = msgs[brandKey] || msgs.vw;
+
+  el.style.display = 'block';
+  el.innerHTML = '<div class="info-box" style="background:rgba(192,57,43,.07);border-color:rgba(192,57,43,.3);color:#8b1a1a;margin-top:4px">'
+    + '⚠️ <strong>Attention</strong> — ' + msg
+    + '</div>';
+}
+
+function hideVenduAlert() {
+  var el = ge('vendu-alert');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+
+
+function enableAllDropdowns() {
+  // Activer rubrique (liste complète)
+  var rubBtn = ge('ss-rub-btn');
+  if (rubBtn) {
+    rubBtn.disabled = false;
+    var rt = rubBtn.querySelector('.ss-txt');
+    if (rt) rt.textContent = '🔍 Rechercher une rubrique…';
+  }
+  // Activer désignation (liste complète)
+  var desigBtn = ge('ss-desig-btn');
+  if (desigBtn) {
+    desigBtn.disabled = false;
+    var dt = desigBtn.querySelector('.ss-txt');
+    if (dt) dt.textContent = '🔍 Rechercher une désignation…';
+  }
+  // Activer code dommage (liste complète)
+  var domBtn = ge('ss-dom-btn');
+  if (domBtn) {
+    domBtn.disabled = false;
+    var dmt = domBtn.querySelector('.ss-txt');
+    if (dmt) dmt.textContent = '🔍 Rechercher par code ou libellé…';
+  }
+}
+
+function renderKulanzForm(site) {
+  var zone = ge('kulanz-questions');
+  if (!zone) return;
+
+  var brand = SITE_BRAND[site] || 'VW';
+  var questions = KULANZ_BY_BRAND[brand] || KULANZ_BY_BRAND['VW'];
+
+  var title = ge('kulanz-title');
+  if (title) title.textContent = 'V\u00e9rifications KULANZ \u2014 ' + brand;
+
+  var html = '';
+  questions.forEach(function(q, idx) {
+
+    // ── TPI ──
+    if (q.name === 'tpi') {
+      html += '<div class="field" style="margin-bottom:12px">'
+        + '<label>' + q.label + '</label>'
+        + '<div class="radio-g" style="gap:16px;margin-top:6px">'
+        + '<label class="r-item"><input type="radio" name="tpi" value="OUI" onchange="checkKulanzNok();toggleTpiField(true)"> Oui</label>'
+        + '<label class="r-item"><input type="radio" name="tpi" value="NON" onchange="checkKulanzNok();toggleTpiField(false)"> Non</label>'
+        + '</div>'
+        + '</div>'
+        + '<div id="tpi-num-field" class="field" style="display:none;margin-top:8px">'
+        + '<label>Num\u00e9ro de TPI</label>'
+        + '<input type="text" name="num_tpi" placeholder="TPI-2025-0042">'
+        + '</div>'
+        + '<div class="divider"></div>';
+      return;
+    }
+
+    // ── vendu_client : conditionnel selon la question pr\u00e9c\u00e9dente ──
+    if (q.name === 'vendu_client') {
+      // Trouver la question pr\u00e9c\u00e9dente (dernier_entretien ou dernier_entretien_audi ou entretien_moment)
+      var prevQ = questions[idx - 1];
+      var prevName = prevQ ? prevQ.name : '';
+      var triggerId = 'vendu-wrapper';
+      html += '<div id="' + triggerId + '" style="display:none">'
+        + '<div class="field">'
+        + '<label>' + q.label + '</label>'
+        + '<div class="radio-g" style="gap:16px;margin-top:6px">'
+        + '<label class="r-item"><input type="radio" name="vendu_client" value="OUI" onchange="checkKulanzNok();hideVenduAlert()"> Oui</label>'
+        + '<label class="r-item"><input type="radio" name="vendu_client" value="NON" onchange="checkKulanzNok();showVenduAlert()"> Non</label>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vendu-alert" style="display:none"></div>'
+        + '</div>';
+      return;
+    }
+
+    var divider = '';
+    var nokOui = q.nok === 'OUI' ? ' <small style="color:var(--red)">\u2192 NOK</small>' : '';
+    var nokNon = q.nok === 'NON' ? ' <small style="color:var(--red)">\u2192 NOK</small>' : '';
+
+    // Questions dernier_entretien* : d\u00e9clenchent l'affichage de vendu_client si NON
+    var isDernierEntretien = (q.name === 'dernier_entretien' || q.name === 'dernier_entretien_audi' || q.name === 'entretien_moment');
+    var onchangeExtra = isDernierEntretien ? ';toggleVenduClient(this.value)' : '';
+    var triggerNok = q.nok ? ' onchange="checkKulanzNok()' + onchangeExtra + '"' : (isDernierEntretien ? ' onchange="toggleVenduClient(this.value)"' : '');
+
+    if (q.has_nc) {
+      html += '<div class="field" style="margin-bottom:12px">'
+        + '<label>' + q.label + '</label>'
+        + '<div class="radio-g" style="gap:16px;margin-top:6px">'
+        + '<label class="r-item"><input type="radio" name="' + q.name + '" value="OUI"' + triggerNok + '> Oui' + nokOui + '</label>'
+        + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NON"' + triggerNok + '> Non' + nokNon + '</label>'
+        + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NC" onchange="checkKulanzNok()"> Non concerné</label>'
+        + '</div>'
+        + '</div>'
+        + divider;
+    } else {
+      html += '<div class="field" style="margin-bottom:12px">'
+        + '<label>' + q.label + '</label>'
+        + '<div class="radio-g" style="gap:16px;margin-top:6px">'
+        + '<label class="r-item"><input type="radio" name="' + q.name + '" value="OUI"' + triggerNok + '> Oui' + nokOui + '</label>'
+        + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NON"' + triggerNok + '> Non' + nokNon + '</label>'
+        + '</div>'
+        + '</div>'
+        + divider;
+    }
+  });
+
+  zone.innerHTML = html;
+
+  var alertZone = ge('kulanz-nok-alert');
+  if (alertZone) { alertZone.classList.remove('show'); alertZone.innerHTML = ''; }
+}
+
+
+
+
+// ═══════════════════════════════════════════════════════════
+// KULANZ NOK — alerte + règles par marque
+// ═══════════════════════════════════════════════════════════
+
+var BRAND_TEXTS = {
+  audi: {
+    title: 'Règles Audi',
+    text: 'Le dernier entretien doit avoir été réalisé chez Audi. S\'il est dû au moment de la réclamation, il devra être réalisé chez Audi pour pouvoir bénéficier des participations commerciales du constructeur.'
+  },
+  vw: {
+    title: 'Règles VW VP / VW Véhicules Utilitaires',
+    text: 'Le dernier entretien doit avoir été réalisé selon les préconisations constructeur. S\'il est dû au moment de la réclamation, il devra être réalisé chez VW ou VW VUL pour bénéficier des participations commerciales.'
+  },
+  skoda: {
+    title: 'Règles Skoda',
+    text: 'Le dernier entretien doit avoir été réalisé selon les préconisations constructeur. Il est nécessaire de fournir l\'avant-dernier entretien pour vérifier le respect des échéances (max 30 000 km / max 24 mois). En cas d\'entretien "à faire" au moment de la réclamation, les deux entretiens précédents devront être fournis.<br><br><strong>Simplification Skoda (oct. 2024) :</strong> En cas d\'utilisation admise du CIG, le Kulanz devient possible dès lors qu\'il est combiné avec un CIG dans une même participation commerciale.'
+  },
+  seat: {
+    title: 'Règles SEAT / CUPRA',
+    text: 'Le dernier entretien doit avoir été réalisé selon les préconisations constructeur. S\'il est dû au moment de la réclamation, il devra être réalisé chez SEAT ou CUPRA pour bénéficier des participations commerciales du constructeur.'
+  }
+};
+
+function checkKulanzNok() {
+  var zone = ge('kulanz-nok-alert');
+  if (!zone) return;
+
+  var site   = ge('f-site') ? ge('f-site').value : '';
+  var brand  = SITE_BRAND[site] || 'VW';
+  var questions = KULANZ_BY_BRAND[brand] || KULANZ_BY_BRAND['VW'];
+
+  // Collecter les réponses et détecter les NOK
+  var reasons = [];
+  questions.forEach(function(q) {
+    if (!q.nok) return;
+    var val = gr(q.name);
+    if (q.nok && val === q.nok && val !== 'NC') {
+      reasons.push(q.info || q.label);
+    }
+  });
+
+  if (!reasons.length) {
+    zone.classList.remove('show');
+    zone.innerHTML = '';
+    return;
+  }
+
+  // Règles par marque (textes popup)
+  var brandKey = brand.toLowerCase();
+  if (brandKey.indexOf('skoda') >= 0) brandKey = 'skoda';
+  else if (brandKey.indexOf('audi') >= 0) brandKey = 'audi';
+  else if (brandKey.indexOf('seat') >= 0) brandKey = 'seat';
+  else brandKey = 'vw';
+
+  var tuningVal = gr('tuning');
+  var tuningNok = (tuningVal === 'OUI');
+
+  var reasonsHtml = reasons.map(function(r) { return '<p>▪️ ' + esc(r) + '</p>'; }).join('');
+  var brandHtml = '';
+  if (BRAND_TEXTS && BRAND_TEXTS[brandKey]) {
+    var b = BRAND_TEXTS[brandKey];
+    brandHtml = '<div class="knok-brand">'
+      + '<div class="knok-brand-title">' + b.title + '</div>'
+      + '<div class="knok-brand-txt">' + b.text + '</div>'
+      + '</div>';
+  }
+
+  var tuningBlock = '';
+  if (tuningNok) {
+    tuningBlock = '<div style="background:#fdf0f0;border:2px solid #c0392b;border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+      + '<div style="font-weight:700;color:#c0392b;font-size:13px;margin-bottom:6px">������Code tuning détecté — KULANZ IMPOSSIBLE</div>'
+      + '<p style="margin:0 0 6px;font-size:12px">Un <strong>code tuning</strong> est présent dans SAGA. '
+      + 'Le constructeur n’accorde aucune participation commerciale sur un véhicule avec code tuning actif.</p>'
+      + '</div>';
+  }
+
+  // tuningBlock affiché en tête dans tous les cas si tuning NOK
+  // + texte générique et règles marque toujours présents
+  // Messages contextuels: chaque NOK → son bloc spécifique
+  var _blocks = '';
+
+  // Tuning
+  if (tuningNok) _blocks += tuningBlock;
+
+  // Pièce d'usure
+  if (gr('piece_usure') === 'OUI') {
+    _blocks += '<div style="background:#fef9e7;border:2px solid #f39c12;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+      + '<div style="font-weight:700;color:#d68910;font-size:13px;margin-bottom:5px">⚠️ Pièce d’usure — Non couverte</div>'
+      + '<p style="margin:0;font-size:12px">Les <strong>pièces d’usure</strong> (filtres, plaquettes, balais, ampoules…) sont exclues des participations constructeur. Elles relèvent de l’entretien normal du véhicule.</p>'
+      + '</div>';
+  }
+
+  // Entretien incomplet / non conforme
+  if (gr('preconisations') === 'NON' || gr('dernier_entretien') === 'NON' || gr('dernier_entretien_audi') === 'NON') {
+    _blocks += '<div style="background:#fef9e7;border:2px solid #e67e22;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+      + '<div style="font-weight:700;color:#ca6f1e;font-size:13px;margin-bottom:5px">📋 Entretien incomplet ou non conforme</div>'
+      + '<p style="margin:0 0 5px;font-size:12px">L’application des participations nécessite le contrôle de tous les entretiens conformément aux préconisations constructeur.</p>'
+      + '<p style="margin:0 0 5px;font-size:12px">Une participation peut être accordée si <strong>aucun lien de causalité</strong> n’existe entre la réclamation et le service manquant.</p>'
+      + '<p style="margin:0;font-size:12px;background:rgba(230,126,34,.1);padding:5px 8px;border-radius:4px"><mark>Si un entretien est <strong>« à faire »</strong></mark>, la participation ne peut être proposée qu’après réalisation.</p>'
+      + '</div>';
+  }
+
+  // Lien dommage/entretien
+  if (gr('lien_entretien') === 'OUI') {
+    _blocks += '<div style="background:#fef9e7;border:2px solid #e67e22;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+      + '<div style="font-weight:700;color:#ca6f1e;font-size:13px;margin-bottom:5px">🔗 Lien dommage / entretien détecté</div>'
+      + '<p style="margin:0;font-size:12px">Un lien de causalité établi entre le dommage et l’entretien rend la demande Kulanz <strong>irrecevable</strong>. Le constructeur considère que le dommage aurait pu être prévenu par un entretien conforme.</p>'
+      + '</div>';
+  }
+
+  // Si aucun bloc spécifique → message générique
+  if (!_blocks) {
+    _blocks = '<p style="font-size:12px">Kulanz non applicable dans l’état actuel des réponses fournies.</p>';
+  }
+
+  var bodyContent = _blocks;
+
+  zone.innerHTML = '<div class="knok-box">'
+    + '<div class="knok-title">⚠ Kulanz non applicable dans l\'état actuel</div>'
+    + '<div class="knok-body">'
+    + bodyContent
+    + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(230,126,34,.3)">'
+    + '<strong style="font-size:11px;color:#c0392b">Motif(s) de non-éligibilité :</strong>'
+    + '<div style="margin-top:6px">' + reasonsHtml + '</div>'
+    + '</div>'
+    + brandHtml
+    + '</div></div>';
+
+  zone.classList.add('show');
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTO-HIDE HEADER au scroll
+// ═══════════════════════════════════════════════════════
+(function() {
+  var lastY    = 0;
+  var header   = null;
+  var ticking  = false;
+  var THRESHOLD = 60; // pixels à scroller avant de cacher
+
+  function onScroll() {
+    if (!ticking) {
+      window.requestAnimationFrame(function() {
+        header = header || document.querySelector('header');
+        if (!header) { ticking = false; return; }
+        var y = window.pageYOffset || document.documentElement.scrollTop;
+        if (y > THRESHOLD) {
+          // Dès qu'on a scrollé plus de THRESHOLD px → cacher
+          header.classList.add('header-hidden');
+        } else {
+          // Seulement au top → montrer
+          header.classList.remove('header-hidden');
+        }
+        lastY = y <= 0 ? 0 : y;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }
+
+  // Activer seulement sur la page formulaire (pas login)
+  function initScrollHide() {
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  // Cliquer sur le bas du header caché le fait réapparaître
+  document.addEventListener('click', function(e) {
+    var h = document.querySelector('header');
+    if (h && h.classList.contains('header-hidden')) {
+      h.classList.remove('header-hidden');
+    }
+  });
+
+  // Lancer après le login
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initScrollHide();
+      initFirebase(); // Firebase initialisé dès le chargement
+    });
+  } else {
+    initScrollHide();
+    initFirebase(); // Firebase initialisé dès le chargement
+  }
+})();
+
