@@ -368,6 +368,7 @@ function deconnecter() {
   ge('login-page').classList.remove('hidden');
   ge('lp-step1').style.display = 'block';
   ge('lp-step2').style.display = 'none';
+  if (ge('lp-step3')) ge('lp-step3').style.display = 'none';
   ge('h-user').style.display = 'none';
   ge('tab-histo').style.display = 'none';
   ge('dash-wrap').classList.remove('on');
@@ -971,7 +972,18 @@ function restoreDraft() {
       ge('h-site-name').textContent = b.site;
       [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
     }
-    ['chassis','kilometrage','or_number','kvps','conseiller_client','email_usager',
+    // Site effectif du brouillon (usager : son site ; team : site du brouillon)
+    var draftSite = (b.site && SITES.indexOf(b.site) !== -1)
+      ? b.site
+      : (ge('f-site') ? ge('f-site').value : '');
+    // Auto-compléter le KVPS et les champs site depuis le site (jamais laissé vide)
+    if (draftSite) {
+      var kvpsEl3 = ge('kvps');
+      if (kvpsEl3) kvpsEl3.value = (b.kvps && b.kvps.trim()) ? b.kvps : (KVPS_MAP[draftSite] || '');
+      var sdEl3 = ge('site-display'); if (sdEl3) sdEl3.value = draftSite;
+      var siteFieldEl = ge('site-field'); if (siteFieldEl) siteFieldEl.style.display = 'flex';
+    }
+    ['chassis','kilometrage','or_number','conseiller_client','email_usager',
      'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
       if (b[n]) sv(n, b[n]);
     });
@@ -1001,14 +1013,13 @@ function restoreDraft() {
         var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=b.dom_code;}
     }
     // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer
-    var draftSite = (b.site && SITES.indexOf(b.site) !== -1) ? b.site : (ge('f-site')?ge('f-site').value:'');
     if (draftSite) renderKulanzForm(draftSite);
     ssSet('ava', b.ava_code, b.ava_lbl);
     if (b.type === 'CCR') setType('C');
     if (b.chassis) onChassis(ge('chassis'));
     // Restaurer les réponses KULANZ
-    if (qs) {
-      var brandQs = typeof KULANZ_BY_BRAND!=='undefined'?KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[]:[];
+    if (typeof KULANZ_BY_BRAND !== 'undefined') {
+      var brandQs = KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[];
       brandQs.forEach(function(q){
         var val = b['k_'+q.name];
         if (val) {
