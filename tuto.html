@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guide d'utilisation — Team Garantie GEA – VW</title>
+<meta name="theme-color" content="#0E8F9E">
+<style>
+:root{
+  --bg:#F6F4EF;--bg2:#FBFAF7;--card:#fff;--line:#E7E2D7;--line2:#EEEAE0;
+  --ink:#1C2A33;--ink-soft:#5A6A72;--muted:#8A949A;
+  --navy:#10293E;--navy2:#1C3A52;
+  --accent:#0E8F9E;--accent-d:#0A7280;--accent-soft:#E4F3F4;--accent-line:#A9DCE0;--mint:#39C9A8;
+  --red:#C0392B;--red-soft:#FBEAE8;--red-line:#EEB9B2;
+  --green:#0B7A6E;--green-soft:#E3F4F0;--green-line:#9FD9CE;
+  --amber:#9A6A00;--amber-soft:#FBF2DA;--amber-line:#EAD08A;
+  --info:#0C447C;--info-soft:#E8F0FA;--info-line:#A9CBED;
+  --shadow:0 1px 3px rgba(28,42,51,.06),0 1px 2px rgba(28,42,51,.04);
+  --shadow-md:0 6px 22px rgba(28,42,51,.10);
+  --r:14px;--font:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent-d)}
+
+/* En-tête */
+.hero{
+  background:linear-gradient(180deg,var(--navy),#0C2030);color:#fff;
+  padding:46px 24px 40px;text-align:center;position:relative;overflow:hidden;
+}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--accent)}
+.hero h1{font-size:30px;font-weight:700;letter-spacing:-.4px}
+.hero h1 span{color:var(--mint)}
+.hero .sub{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:10px}
+.hero .tag{display:inline-block;margin-top:18px;font-size:12px;font-weight:600;color:var(--mint);background:rgba(57,201,168,.12);border:1px solid rgba(57,201,168,.4);padding:6px 16px;border-radius:30px}
+.back{display:inline-flex;align-items:center;gap:6px;margin-top:20px;font-size:13px;font-weight:700;color:#fff;background:var(--accent);padding:10px 22px;border-radius:30px;text-decoration:none;transition:background .18s}
+.back:hover{background:var(--accent-d)}
+
+.wrap{max-width:860px;margin:0 auto;padding:30px 22px 70px}
+
+/* Sommaire */
+.toc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:20px 22px;margin-bottom:28px}
+.toc h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:14px}
+.toc ol{list-style:none;counter-reset:t;display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}
+.toc li{counter-increment:t}
+.toc a{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-size:14px;font-weight:600;padding:6px 0}
+.toc a::before{content:counter(t);width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent-d);border-radius:50%;font-size:12px;font-weight:700}
+.toc a:hover{color:var(--accent-d)}
+
+/* Sections */
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;scroll-margin-top:18px}
+.s-head{display:flex;align-items:center;gap:12px;padding:16px 22px;background:var(--bg2);border-bottom:1px solid var(--accent-soft);position:relative}
+.s-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.s-num{width:30px;height:30px;flex-shrink:0;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.s-head h2{font-size:17px;font-weight:700;color:var(--ink)}
+.s-body{padding:22px}
+.s-body p{margin-bottom:12px;color:var(--ink-soft)}
+.s-body p strong{color:var(--ink)}
+.s-body h3{font-size:14px;font-weight:700;color:var(--ink);margin:18px 0 8px}
+.s-body h3:first-child{margin-top:0}
+
+/* Étapes numérotées */
+.steps{list-style:none;counter-reset:st;display:flex;flex-direction:column;gap:12px;margin:6px 0 4px}
+.steps li{counter-increment:st;position:relative;padding-left:42px;color:var(--ink-soft)}
+.steps li::before{content:counter(st);position:absolute;left:0;top:0;width:28px;height:28px;background:var(--navy);color:var(--mint);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.steps li strong{color:var(--ink)}
+
+ul.bul{list-style:none;display:flex;flex-direction:column;gap:8px;margin:4px 0 10px}
+ul.bul li{position:relative;padding-left:22px;color:var(--ink-soft)}
+ul.bul li::before{content:"▪";position:absolute;left:4px;color:var(--accent)}
+ul.bul li strong{color:var(--ink)}
+
+/* Encadrés */
+.note,.warn,.tip{border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.55;margin:14px 0}
+.note{background:var(--info-soft);border:1px solid var(--info-line);color:var(--info)}
+.warn{background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber)}
+.tip{background:var(--green-soft);border:1px solid var(--green-line);color:var(--green)}
+.note strong,.warn strong,.tip strong{font-weight:700}
+
+/* Badges de statut (identiques à l'app) */
+.badges{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.badge{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px}
+.b-wait{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line)}
+.b-ok{background:var(--green-soft);color:var(--green);border:1px solid var(--green-line)}
+.b-no{background:var(--red-soft);color:var(--red);border:1px solid var(--red-line)}
+.b-comp{background:var(--info-soft);color:var(--info);border:1px solid var(--info-line)}
+
+/* Faux boutons illustratifs */
+.demo{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:6px 13px;border-radius:8px;vertical-align:middle}
+.demo.teal{background:var(--accent);color:#fff}
+.demo.navy{background:var(--navy);color:var(--mint)}
+.demo.ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink-soft)}
+
+table.kv{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+table.kv th,table.kv td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line2)}
+table.kv th{background:var(--navy);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+table.kv tr:last-child td{border-bottom:none}
+table.kv td:first-child{font-weight:600;color:var(--ink)}
+
+.faq dt{font-weight:700;color:var(--ink);margin-top:14px}
+.faq dd{color:var(--ink-soft);margin-top:4px}
+
+footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 22px 40px}
+footer strong{color:var(--accent-d)}
+
+@media (max-width:600px){
+  .toc ol{grid-template-columns:1fr}
+  .hero h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Team Garantie <span>GEA – VW</span></h1>
+  <div class="sub">Guide d'utilisation</div>
+  <div class="tag">Demandes KULANZ &amp; CCR · 9 sites</div>
+  <br>
+  <a class="back" href="index.html">← Retour à l'application</a>
+</div>
+
+<div class="wrap">
+
+  <!-- Sommaire -->
+  <nav class="toc">
+    <h2>Sommaire</h2>
+    <ol>
+      <li><a href="#connexion">Se connecter</a></li>
+      <li><a href="#demande">Créer une demande KULANZ</a></li>
+      <li><a href="#codes">Choisir les codes (cascade)</a></li>
+      <li><a href="#ccr">Faire une demande CCR</a></li>
+      <li><a href="#envoi">Envoyer &amp; enregistrer en PDF</a></li>
+      <li><a href="#team">Espace TeamGarantie</a></li>
+      <li><a href="#statuts">Les statuts</a></li>
+      <li><a href="#faq">Questions fréquentes</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. Connexion -->
+  <section id="connexion">
+    <div class="s-head"><div class="s-num">1</div><h2>Se connecter</h2></div>
+    <div class="s-body">
+      <p>À l'ouverture, l'écran propose deux profils :</p>
+      <ul class="bul">
+        <li><strong>👤 Usager</strong> — pour créer et suivre les demandes de votre site.</li>
+        <li><strong>🛡️ TeamGarantie</strong> — pour valider les demandes et consulter l'historique de tous les sites.</li>
+      </ul>
+
+      <h3>En tant qu'usager</h3>
+      <ol class="steps">
+        <li>Cliquez sur <strong>Usager</strong>.</li>
+        <li>Sélectionnez votre <strong>site</strong> (Audi, SEAT, SKODA ou VW).</li>
+        <li>Saisissez votre e-mail <strong>@geauto.fr</strong> et votre mot de passe, puis <span class="demo teal">Se connecter</span>.</li>
+      </ol>
+      <div class="note">Le <strong>KVPS</strong> et le nom du site se remplissent automatiquement selon le site choisi. Vous n'avez rien à ressaisir.</div>
+
+      <h3>En tant que TeamGarantie</h3>
+      <ol class="steps">
+        <li>Cliquez sur <strong>TeamGarantie</strong>.</li>
+        <li>Connectez-vous avec votre e-mail TeamGarantie et votre mot de passe.</li>
+      </ol>
+      <div class="warn">L'accès TeamGarantie est réservé aux comptes autorisés. Un compte usager standard ne peut pas y entrer ; pour être ajouté, contactez <strong>teamgarantie@geauto.fr</strong>.</div>
+      <p>Mot de passe oublié ? Utilisez le lien <strong>🔑 Mot de passe oublié ?</strong> : un e-mail de réinitialisation vous est envoyé.</p>
+    </div>
+  </section>
+
+  <!-- 2. Demande KULANZ -->
+  <section id="demande">
+    <div class="s-head"><div class="s-num">2</div><h2>Créer une demande KULANZ</h2></div>
+    <div class="s-body">
+      <p>Une fois connecté, l'onglet <span class="demo ghost">📝 Formulaire</span> est actif et le type <span class="demo navy">Demande KULANZ</span> est sélectionné par défaut.</p>
+
+      <h3>① Identification du véhicule</h3>
+      <ul class="bul">
+        <li><strong>Numéro de châssis</strong> — 17 caractères. Il est contrôlé en direct (les lettres I, O, Q sont interdites). Un ✔ vert confirme un châssis valide.</li>
+        <li><strong>Kilométrage</strong> et <strong>N° d'OR</strong> (6 chiffres).</li>
+        <li><strong>Date de l'OR</strong>, <strong>nom du demandeur</strong> et votre <strong>e-mail</strong> de suivi.</li>
+      </ul>
+      <div class="tip">Si un véhicule a déjà fait l'objet d'une demande, commencez à taper le châssis : une <strong>suggestion</strong> apparaît et pré-remplit kilométrage, date, demandeur, e-mail…</div>
+
+      <h3>② Nature du dommage</h3>
+      <ul class="bul">
+        <li><strong>Plainte du client</strong> — décrivez le symptôme signalé.</li>
+        <li><strong>Catégorie</strong> — choisissez un domaine (Motopropulseur, Transmission, Trains roulants, Carrosserie, Chauffage/Clim, Équip. électrique) ou « Saisie libre ».</li>
+        <li><strong>Rubrique → Désignation → Code dommage → Code avarie</strong> — voir la section suivante.</li>
+      </ul>
+
+      <h3>③ Vérifications KULANZ</h3>
+      <p>Les questions s'adaptent automatiquement à la <strong>marque du site</strong> (VW, Audi, SEAT, SKODA). Répondez par Oui / Non. Si une réponse rend le dossier <strong>non éligible (NOK)</strong>, une alerte rouge explique pourquoi et rappelle la règle constructeur correspondante.</p>
+      <div class="note">Exemples de blocages : <strong>code tuning</strong> présent dans SAGA, <strong>pièce d'usure</strong>, ou <strong>préconisations d'entretien non respectées</strong>.</div>
+    </div>
+  </section>
+
+  <!-- 3. Codes -->
+  <section id="codes">
+    <div class="s-head"><div class="s-num">3</div><h2>Choisir les codes (cascade)</h2></div>
+    <div class="s-body">
+      <p>Les quatre champs fonctionnent en <strong>cascade</strong> : chaque choix affine le suivant.</p>
+      <ol class="steps">
+        <li><strong>Rubrique</strong> — filtrée selon la catégorie choisie. Cliquez sur le champ, tapez quelques lettres, sélectionnez.</li>
+        <li><strong>Désignation pièce</strong> — la liste se limite aux pièces de la rubrique retenue.</li>
+        <li><strong>Code dommage</strong> — proposé automatiquement à partir de la désignation. S'il n'existe qu'un seul code, il est sélectionné pour vous.</li>
+        <li><strong>Code avarie</strong> — décrit le type de défaut (mécanique, corrosion, étanchéité…).</li>
+      </ol>
+      <div class="tip">Chaque liste possède une recherche (par code ou libellé) et une <strong>saisie manuelle</strong> si le code voulu ne figure pas dans la liste. Le bouton <span class="demo ghost">✕ Effacer</span> réinitialise un champ.</div>
+      <div class="note">Renseigner un code dommage remonte automatiquement la rubrique et la catégorie correspondantes si elles étaient vides — pratique pour aller plus vite.</div>
+    </div>
+  </section>
+
+  <!-- 4. CCR -->
+  <section id="ccr">
+    <div class="s-head"><div class="s-num">4</div><h2>Faire une demande CCR</h2></div>
+    <div class="s-body">
+      <p>Basculez sur <span class="demo ghost">Demande CCR</span> en haut du formulaire.</p>
+      <div class="warn">Une demande <strong>KULANZ doit avoir été effectuée avant</strong> toute demande CCR.</div>
+      <h3>Gagner du temps</h3>
+      <p>Si vous venez de remplir une KULANZ, cliquez sur <span class="demo teal">Copier les données depuis Kulanz</span> : châssis, OR, plainte, codes… sont repris automatiquement dans la CCR.</p>
+      <h3>À compléter</h3>
+      <ul class="bul">
+        <li><strong>Prérequis</strong> : confirmez que la KULANZ a été faite.</li>
+        <li><strong>Pièces à fournir</strong> : cochez les justificatifs (devis au taux garantie, ELSA, factures d'entretien, IQ, etc.).</li>
+        <li><strong>Règle CIG</strong> : CIG 70/30 de 16 % obligatoire (ou taux supérieur à préciser).</li>
+        <li><strong>Case d'engagement</strong> : à cocher obligatoirement avant l'envoi.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5. Envoi -->
+  <section id="envoi">
+    <div class="s-head"><div class="s-num">5</div><h2>Envoyer &amp; enregistrer en PDF</h2></div>
+    <div class="s-body">
+      <ul class="bul">
+        <li><span class="demo teal">Envoyer la demande</span> — vérifie les champs obligatoires puis enregistre la demande. Pour une <strong>CCR</strong>, un e-mail pré-rempli vers <strong>teamgarantie@geauto.fr</strong> s'ouvre dans votre messagerie ; il ne reste qu'à joindre le PDF et envoyer.</li>
+        <li><span class="demo ghost">Enregistrer en PDF</span> — génère un PDF récapitulatif de la demande, à conserver ou à joindre.</li>
+      </ul>
+      <div class="note">Le sujet de l'e-mail CCR est normalisé : <em>« Demande CCR – KVPS – Site – Châssis – Demandeur »</em>, ce qui facilite le traitement.</div>
+      <div class="warn">Si un champ obligatoire manque (châssis, OR, plainte, désignation, code dommage, code avarie, nom, e-mail), un message vous l'indique et l'envoi est bloqué tant qu'il n'est pas corrigé.</div>
+    </div>
+  </section>
+
+  <!-- 6. TeamGarantie -->
+  <section id="team">
+    <div class="s-head"><div class="s-num">6</div><h2>Espace TeamGarantie</h2></div>
+    <div class="s-body">
+      <p>Connecté en TeamGarantie, vous disposez en plus :</p>
+      <ul class="bul">
+        <li>D'une <strong>barre de sélection des sites</strong> et d'un <strong>tableau de bord</strong> indiquant, par site, le nombre de demandes en attente, validées et le total. Une pastille orange signale les sites avec des demandes en attente.</li>
+        <li>De l'onglet <span class="demo ghost">📋 Historique</span> donnant accès à toutes les demandes, avec filtres par type et par statut.</li>
+      </ul>
+      <h3>Valider une demande</h3>
+      <ol class="steps">
+        <li>Dans l'historique, cliquez sur <span class="demo teal">Valider</span> sur la ligne concernée.</li>
+        <li>Un panneau latéral s'ouvre : choisissez le <strong>statut</strong>, ajoutez un <strong>commentaire</strong>.</li>
+        <li>Si le statut est <strong>Traitée</strong>, renseignez le <strong>commerce de détail</strong> (% main d'œuvre, pièces, MO et pièces extérieures, type d'extension).</li>
+        <li>Cliquez sur <span class="demo teal">✔ Confirmer</span>. Pour un statut final, un e-mail de notification est préparé automatiquement.</li>
+      </ol>
+      <div class="warn">Le bouton <span class="demo ghost">🗑 Vider</span> supprime <strong>définitivement</strong> les demandes du site sélectionné. L'action demande une confirmation par mot de passe et est <strong>irréversible</strong>.</div>
+    </div>
+  </section>
+
+  <!-- 7. Statuts -->
+  <section id="statuts">
+    <div class="s-head"><div class="s-num">7</div><h2>Les statuts</h2></div>
+    <div class="s-body">
+      <div class="badges">
+        <span class="badge b-wait">🟡 En attente</span>
+        <span class="badge b-ok">✅ Traitée</span>
+        <span class="badge b-no">❌ Traitée sans participation</span>
+        <span class="badge b-comp">🔄 Complément requis</span>
+      </div>
+      <table class="kv">
+        <tr><th>Statut</th><th>Signification</th></tr>
+        <tr><td>En attente</td><td>Demande reçue, en cours d'examen par TeamGarantie.</td></tr>
+        <tr><td>Traitée</td><td>Accordée — la prise en charge commerciale est renseignée.</td></tr>
+        <tr><td>Traitée sans participation</td><td>Examinée mais sans participation accordée.</td></tr>
+        <tr><td>Complément requis</td><td>Un document ou une information manque ; à compléter.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 8. FAQ -->
+  <section id="faq">
+    <div class="s-head"><div class="s-num">8</div><h2>Questions fréquentes</h2></div>
+    <div class="s-body">
+      <dl class="faq">
+        <dt>Le menu de code avarie / dommage ne s'ouvre pas entièrement ?</dt>
+        <dd>Videz le cache de votre navigateur (Ctrl + Maj + R) pour charger la dernière version. Le menu doit s'afficher complet, par-dessus la section suivante.</dd>
+
+        <dt>Mon e-mail @geauto.fr est refusé à la connexion usager.</dt>
+        <dd>S'il s'agit d'un compte TeamGarantie, utilisez le bouton « TeamGarantie ». Sinon, vérifiez l'orthographe ; en cas d'oubli du mot de passe, utilisez « Mot de passe oublié ? ».</dd>
+
+        <dt>La cascade ne propose pas le bon code.</dt>
+        <dd>Utilisez la recherche par libellé, ou la <strong>saisie manuelle</strong> en bas de chaque liste.</dd>
+
+        <dt>Je ne vois pas l'onglet Historique.</dt>
+        <dd>L'historique complet et la validation sont réservés au profil <strong>TeamGarantie</strong>.</dd>
+
+        <dt>Comment ajouter un membre à TeamGarantie ?</dt>
+        <dd>Contactez <strong>teamgarantie@geauto.fr</strong> pour ajouter l'adresse à la liste des comptes autorisés.</dd>
+      </dl>
+      <div class="note">Une question non couverte ici ? Écrivez à <strong>teamgarantie@geauto.fr</strong>.</div>
+    </div>
+  </section>
+
+  <div style="text-align:center;margin-top:8px">
+    <a class="back" href="index.html">← Retour à l'application</a>
+  </div>
+</div>
+
+<footer>
+  Team Garantie GEA – VW · Guide d'utilisation · Demandes <strong>KULANZ</strong> &amp; <strong>CCR</strong>
+</footer>
+
+</body>
+</html>
