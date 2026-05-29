@@ -286,60 +286,7 @@ function focusAuthPwd() {
   var p = ge('auth-pwd'); if (p) p.focus();
 }
 
-function connecterUsager() {
-  var email = (ge('auth-email') ? ge('auth-email').value : '').trim();
-  var pwd   = ge('auth-pwd')   ? ge('auth-pwd').value   : '';
-  var err   = ge('auth-error');
-
-  // Validation e-mail @geauto.fr
-  if (!email) {
-    if (err) { err.textContent = 'Saisissez votre e-mail.'; err.style.display = 'block'; }
-    ge('auth-email').focus(); return;
-  }
-  if (!email.toLowerCase().endsWith('@geauto.fr')) {
-    if (err) { err.textContent = 'Utilisez votre e-mail professionnel @geauto.fr'; err.style.display = 'block'; }
-    ge('auth-email').focus(); return;
-  }
-  if (!pwd) {
-    if (err) { err.textContent = 'Saisissez votre mot de passe.'; err.style.display = 'block'; }
-    ge('auth-pwd').focus(); return;
-  }
-  if (err) err.style.display = 'none';
-
-  // Bouton en chargement
-  var btn = document.querySelector('#lp-step2 button[onclick="connecterUsager()"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
-
-  // Firebase Auth — s'assurer que Firebase est initialisé
-  if (typeof firebase === 'undefined') {
-    if (err) { err.textContent = 'Erreur : Firebase non chargé. Rechargez la page.'; err.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    return;
-  }
-  // Initialiser Firebase si pas encore fait
-  if (!firebase.apps || !firebase.apps.length) { initFirebase(); }
-  if (!firebase.auth || typeof firebase.auth !== 'function') {
-    if (err) { err.textContent = 'Service auth indisponible. Rechargez la page.'; err.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    return;
-  }
-
-  firebase.auth().signInWithEmailAndPassword(email, pwd)
-    .then(function() {
-      G.role = 'usager';
-      // G.site déjà défini par loginUsager()
-      ouvrirApp();
-    })
-    .catch(function(e) {
-      var msg = 'E-mail ou mot de passe incorrect.';
-      if (e.code === 'auth/user-not-found')   msg = 'Compte introuvable. Contactez teamgarantie@geauto.fr';
-      if (e.code === 'auth/wrong-password')   msg = 'Mot de passe incorrect.';
-      if (e.code === 'auth/invalid-email')    msg = 'E-mail invalide.';
-      if (e.code === 'auth/too-many-requests')msg = 'Trop de tentatives. Réessayez dans quelques minutes.';
-      if (err) { err.textContent = msg; err.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    });
-}
+// connecterUsager() est defini dans index.html (flux de connexion Firebase a jour).
 
 function deconnecterUsager() {
   if (firebase && firebase.auth) {
@@ -1183,7 +1130,7 @@ function envoyerFormulaire() {
     // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
     var corps = 'DEMANDE CCR - ' + site + '\n';
     corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
-    corps += 'Technicien: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
+    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
     corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
     corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
     corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
@@ -1757,39 +1704,39 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var sujet = 'Demande Kulanz_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
 
   // Corps du mail
-  var sep  = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-  var sep2 = '─────────────────────────────────────────────────────';
-  var statIcon = statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
-  var corps = sep + '\n';
-  corps += '🔧  DEMANDE KULANZ — ' + (d.site||'').toUpperCase() + '\n';
-  corps += sep + '\n\n';
-  corps += '📋  IDENTIFICATION\n' + sep2 + '\n';
-  corps += '  N° OR          : ' + (d.or_number||'—') + '\n';
-  corps += '  Date OR        : ' + (d.date_or||'—') + '\n';
-  corps += '  Châssis        : ' + (d.chassis||'—') + '\n';
-  corps += '  Kilométrage    : ' + (d.kilometrage||'—') + ' km\n';
-  corps += '  KVPS           : ' + (kvps||'—') + '\n';
-  corps += '  Conseiller     : ' + (d.conseiller_client||'—') + '\n';
-  corps += '  E-mail         : ' + (d.email_usager||'—') + '\n\n';
-  corps += '🔩  DOMMAGE\n' + sep2 + '\n';
-  corps += '  Catégorie      : ' + (d.categorie||'—') + '\n';
-  corps += '  Rubrique       : ' + (d.rubrique||'—') + '\n';
-  corps += '  Désignation    : ' + (d.designation||'—') + '\n';
-  corps += '  Code dommage   : ' + (d.code_dom||'—') + '\n';
-  corps += '  Code avarie    : ' + (d.code_ava||'—') + '\n';
-  if (d.plainte_client) corps += '  Plainte client : ' + d.plainte_client + '\n';
-  corps += '\n' + statIcon + '  STATUT : ' + statut.toUpperCase() + '\n' + sep2 + '\n';
-  if (commentaire) corps += '  Commentaire    : ' + commentaire + '\n';
-  if (statut === 'Traitée' && commerce) {
-    corps += '\n💶  PARTICIPATION COMMERCIALE\n' + sep2 + '\n';
-    if (commerce.mo_de)  corps += '  MO             : ' + commerce.mo_de + ' %\n';
-    if (commerce.pi_de)  corps += '  Pièces         : ' + commerce.pi_de + ' %\n';
-    if (commerce.moe_de) corps += '  MO Ext         : ' + commerce.moe_de + ' %\n';
-    if (commerce.pe_de)  corps += '  Pièces Ext     : ' + commerce.pe_de + ' %\n';
+  var sep='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  var sep2='─────────────────────────────────────────────────────';
+  var statIcon=statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
+  var corps=sep+'\n';
+  corps+='🔧  DEMANDE KULANZ — '+(d.site||'').toUpperCase()+'\n';
+  corps+=sep+'\n\n';
+  corps+='📋  IDENTIFICATION\n'+sep2+'\n';
+  corps+='  N° OR          : '+(d.or_number||'—')+'\n';
+  corps+='  Date OR        : '+(d.date_or||'—')+'\n';
+  corps+='  Châssis        : '+(d.chassis||'—')+'\n';
+  corps+='  Kilométrage    : '+(d.kilometrage||'—')+' km\n';
+  corps+='  KVPS           : '+(kvps||'—')+'\n';
+  corps+='  Conseiller     : '+(d.conseiller_client||'—')+'\n';
+  corps+='  E-mail         : '+(d.email_usager||'—')+'\n\n';
+  corps+='🔩  DOMMAGE\n'+sep2+'\n';
+  corps+='  Catégorie      : '+(d.categorie||'—')+'\n';
+  corps+='  Rubrique       : '+(d.rubrique||'—')+'\n';
+  corps+='  Désignation    : '+(d.designation||'—')+'\n';
+  corps+='  Code dommage   : '+(d.code_dom||'—')+'\n';
+  corps+='  Code avarie    : '+(d.code_ava||'—')+'\n';
+  if(d.plainte_client) corps+='  Plainte client : '+d.plainte_client+'\n';
+  corps+='\n'+statIcon+'  STATUT : '+statut.toUpperCase()+'\n'+sep2+'\n';
+  if(commentaire) corps+='  Commentaire    : '+commentaire+'\n';
+  if(statut==='Traitée'&&commerce){
+    corps+='\n💶  PARTICIPATION COMMERCIALE\n'+sep2+'\n';
+    if(commerce.mo_de)  corps+='  MO             : '+commerce.mo_de+' %\n';
+    if(commerce.pi_de)  corps+='  Pièces         : '+commerce.pi_de+' %\n';
+    if(commerce.moe_de) corps+='  MO Ext         : '+commerce.moe_de+' %\n';
+    if(commerce.pe_de)  corps+='  Pièces Ext     : '+commerce.pe_de+' %\n';
   }
-  corps += '\n' + sep + '\n';
-  corps += 'Team Garantie GEA – VW  |  Alsace  |  teamgarantie@geauto.fr\n';
-  corps += sep + '\n';
+  corps+='\n'+sep+'\n';
+  corps+='Team Garantie GEA – VW  |  Alsace  |  teamgarantie@geauto.fr\n';
+  corps+=sep+'\n';
 
   // Ouvrir Outlook avec l'email pré-rempli
   var dest = d.email_usager || d.email || '';
@@ -1798,14 +1745,9 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var sujetEnc = encodeURIComponent(sujet);
   var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
 
-  var a = document.createElement('a');
-  a.href = mailto;
-  a.click();
-
-  toast('✔ Mail préparé dans Outlook');
+  window.location.href = mailto;
+  toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
 }
-
-// Générer PDF récapitulatif Kulanz pour TeamGarantie
 
 
 function sendStatusMail(d, statut, commentaire, commerce) {
