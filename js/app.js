@@ -103,7 +103,8 @@ var G = {
   activeId: null,  // demande en cours de validation
   kulanzData: {}, // copie kulanz pour CCR
   fbListening: false,
-  demandeType: 'K' // K = Kulanz, C = CCR
+  demandeType: 'K', // K = Kulanz, C = CCR
+  editingId: null   // id de la demande rouverte pour modification (null = nouvelle demande)
 };
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -909,30 +910,38 @@ function copyKulanz() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 var draftTimer = null;
 
+// Capture COMPLÈTE de l'état du formulaire (tous les champs + réponses KULANZ).
+// Utilisée pour le brouillon ET pour enregistrer toutes les données d'une demande.
+function formSnapshot() {
+  var b = {
+    site: ge('f-site').value, type: ge('f-type').value,
+    chassis: gv('chassis'), kilometrage: gv('kilometrage'),
+    or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
+    conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
+    plainte_client: gv('plainte_client'),
+    emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
+    desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
+    dom_cat: ge('dom-cat') ? ge('dom-cat').value : '',
+    dom_rub: ge('rub-val') ? ge('rub-val').value : '',
+    dom_code: ge('dom-val') ? ge('dom-val').value : '',
+    dom_lbl: ge('dom-lbl') ? ge('dom-lbl').value : '',
+    ava_code: ge('ava-val') ? ge('ava-val').value : '',
+    ava_lbl: ge('ava-lbl') ? ge('ava-lbl').value : ''
+  };
+  var _s = ge('f-site') ? ge('f-site').value : '';
+  var _q = (typeof KULANZ_BY_BRAND!=='undefined' && typeof SITE_BRAND!=='undefined')
+    ? (KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]) : [];
+  _q.forEach(function(q){ b['k_'+q.name] = gr(q.name) || ''; });
+  b.num_tpi = gv('num_tpi') || '';
+  return b;
+}
+
 function saveDraft() {
   clearTimeout(draftTimer);
   draftTimer = setTimeout(function() {
-    var b = {
-      site: ge('f-site').value, type: ge('f-type').value,
-      chassis: gv('chassis'), kilometrage: gv('kilometrage'),
-      or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
-      conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
-      plainte_client: gv('plainte_client'),
-      emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
-      desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
-      dom_cat: ge('dom-cat') ? ge('dom-cat').value : '',
-      dom_rub: ge('rub-val') ? ge('rub-val').value : '',
-      dom_code: ge('dom-val') ? ge('dom-val').value : '',
-      dom_lbl: ge('dom-lbl') ? ge('dom-lbl').value : '',
-      ava_code: ge('ava-val') ? ge('ava-val').value : '',
-      ava_lbl: ge('ava-lbl') ? ge('ava-lbl').value : ''
-    };
-    var _s=ge('f-site')?ge('f-site').value:'';
-    var _q=(typeof KULANZ_BY_BRAND!=='undefined'&&typeof SITE_BRAND!=='undefined')
-      ?(KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]):[];
-    _q.forEach(function(q){b['k_'+q.name]=gr(q.name)||'';});
-    b.num_tpi=gv('num_tpi')||'';
-    try { var _draftKey = 'gea_draft_' + (_s || 'default');
+    var b = formSnapshot();
+    var _s = b.site || 'default';
+    try { var _draftKey = 'gea_draft_' + _s;
       localStorage.setItem(_draftKey, JSON.stringify(b));
       localStorage.setItem('gea_draft_last', _draftKey); } catch(e) {}
   }, 700);
@@ -956,72 +965,96 @@ function restoreDraft() {
       (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })();
       return;
     }
-    // Restaurer le site uniquement si valide
-    if (b.site && SITES.indexOf(b.site) !== -1 && G.role === 'team') {
-      ge('f-site').value = b.site;
-      ge('h-site-name').textContent = b.site;
-      [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
-    }
-    // Site effectif du brouillon (usager : son site ; team : site du brouillon)
-    var draftSite = (b.site && SITES.indexOf(b.site) !== -1)
-      ? b.site
-      : (ge('f-site') ? ge('f-site').value : '');
-    // Auto-compléter le KVPS et les champs site depuis le site (jamais laissé vide)
-    if (draftSite) {
-      var kvpsEl3 = ge('kvps');
-      if (kvpsEl3) kvpsEl3.value = (b.kvps && b.kvps.trim()) ? b.kvps : (KVPS_MAP[draftSite] || '');
-      var sdEl3 = ge('site-display'); if (sdEl3) sdEl3.value = draftSite;
-      var siteFieldEl = ge('site-field'); if (siteFieldEl) siteFieldEl.style.display = 'flex';
-    }
-    ['chassis','kilometrage','or_number','conseiller_client','email_usager',
-     'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
-      if (b[n]) sv(n, b[n]);
-    });
-    if (b.date_or && /^\d{4}-\d{2}-\d{2}$/.test(b.date_or)) sv('date_or', b.date_or);
-    if (b.dom_cat) {
-      var ci=ge('dom-cat'); if(ci)ci.value=b.dom_cat;
-      var cb=document.querySelector('.cat-btn[data-cat="'+b.dom_cat+'"]');
-      if(cb)cb.classList.add('active');
-      var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+b.dom_cat;ch.className='hint ok';}
-    }
-    if (b.dom_rub) {
-      var rv=ge('rub-val'); if(rv)rv.value=b.dom_rub;
-      ssState['rub']={code:b.dom_rub,label:b.dom_rub};
-      var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
-        var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=b.dom_rub;}
-    }
-    if (b.desig_piece) {
-      var dv=ge('desig-val'); if(dv)dv.value=b.desig_piece;
-      ssState['desig']={code:b.desig_piece,label:b.desig_piece};
-      var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
-        var dbt=db.querySelector('.ss-txt');if(dbt)dbt.textContent=b.desig_piece;}
-    }
-    if (b.dom_code) {
-      var dv2=ge('dom-val'); if(dv2)dv2.value=b.dom_code;
-      ssState['dom']={code:b.dom_code,label:b.dom_lbl||b.dom_code};
-      var dm=ge('ss-dom-btn'); if(dm){dm.classList.add('filled');
-        var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=b.dom_code;}
-    }
-    // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer
-    if (draftSite) renderKulanzForm(draftSite);
-    ssSet('ava', b.ava_code, b.ava_lbl);
-    if (b.type === 'CCR') setType('C');
-    if (b.chassis) onChassis(ge('chassis'));
-    // Restaurer les réponses KULANZ
-    if (typeof KULANZ_BY_BRAND !== 'undefined') {
-      var brandQs = KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[];
-      brandQs.forEach(function(q){
-        var val = b['k_'+q.name];
-        if (val) {
-          var radios = document.querySelectorAll('[name="'+q.name+'"]');
-          [].forEach.call(radios, function(r){ r.checked = (r.value===val); });
-        }
-      });
-      if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
-    }
-    checkKulanzNok();
+    fillFormFromRecord(b);
     toast('✔ Brouillon restauré !');
   } catch(e) { console.warn('Draft restore error:', e); }
+}
+
+// Remplit le formulaire à partir d'un objet (brouillon OU demande enregistrée).
+// Accepte les deux schémas de noms : brouillon (or_number/dom_*) et enregistrement (or/code_dommage…).
+function fillFormFromRecord(b) {
+  if (!b) return;
+  // Normaliser les variantes de noms de champs entre brouillon et demande stockée
+  var or_number = b.or_number || b.or || '';
+  var dom_cat   = b.dom_cat   || b.categorie || '';
+  var dom_rub   = b.dom_rub   || b.rubrique  || '';
+  var desig     = b.desig_piece || '';
+
+  // Restaurer le site (team : on l'applique ; usager : déjà fixé par son login)
+  if (b.site && SITES.indexOf(b.site) !== -1 && G.role === 'team') {
+    ge('f-site').value = b.site;
+    ge('h-site-name').textContent = b.site;
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
+  }
+  var draftSite = (b.site && SITES.indexOf(b.site) !== -1)
+    ? b.site
+    : (ge('f-site') ? ge('f-site').value : '');
+  // KVPS + champs site (jamais laissés vides)
+  if (draftSite) {
+    var kvpsEl3 = ge('kvps');
+    if (kvpsEl3) kvpsEl3.value = (b.kvps && String(b.kvps).trim()) ? b.kvps : (KVPS_MAP[draftSite] || '');
+    var sdEl3 = ge('site-display'); if (sdEl3) sdEl3.value = draftSite;
+    var siteFieldEl = ge('site-field'); if (siteFieldEl) siteFieldEl.style.display = 'flex';
+  }
+  // Champs texte simples
+  if (or_number) sv('or_number', or_number);
+  ['chassis','kilometrage','conseiller_client','email_usager',
+   'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
+    if (b[n]) sv(n, b[n]);
+  });
+  if (b.date_or && /^\d{4}-\d{2}-\d{2}$/.test(b.date_or)) sv('date_or', b.date_or);
+  // Catégorie
+  if (dom_cat) {
+    var ci=ge('dom-cat'); if(ci)ci.value=dom_cat;
+    var cb=document.querySelector('.cat-btn[data-cat="'+dom_cat+'"]');
+    if(cb)cb.classList.add('active');
+    var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+dom_cat;ch.className='hint ok';}
+  }
+  // Rubrique
+  if (dom_rub) {
+    var rv=ge('rub-val'); if(rv)rv.value=dom_rub;
+    ssState['rub']={code:dom_rub,label:dom_rub};
+    var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
+      var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=dom_rub;}
+  }
+  // Désignation
+  if (desig) {
+    var dv=ge('desig-val'); if(dv)dv.value=desig;
+    ssState['desig']={code:desig,label:desig};
+    var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
+      var dbt=db.querySelector('.ss-txt');if(dbt)dbt.textContent=desig;}
+  }
+  // Code dommage : brouillon a dom_code/dom_lbl ; enregistrement a "code — libellé" dans code_dommage
+  var dCode = b.dom_code || '', dLbl = b.dom_lbl || '';
+  if (!dCode && b.code_dommage) {
+    var parts = String(b.code_dommage).split(' — ');
+    dCode = parts[0] || ''; dLbl = parts[1] || '';
+  }
+  if (dCode) {
+    var dv2=ge('dom-val'); if(dv2)dv2.value=dCode;
+    var dl=ge('dom-lbl'); if(dl)dl.value=dLbl;
+    ssState['dom']={code:dCode,label:dLbl||dCode};
+    var dm=ge('ss-dom-btn'); if(dm){dm.classList.add('filled');
+      var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=dCode+(dLbl?' — '+dLbl:'');}
+  }
+  // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer les réponses
+  if (draftSite) renderKulanzForm(draftSite);
+  if (b.ava_code) ssSet('ava', b.ava_code, b.ava_lbl);
+  if ((b.type === 'CCR')) setType('C');
+  if (b.chassis) onChassis(ge('chassis'));
+  // Réponses KULANZ
+  if (typeof KULANZ_BY_BRAND !== 'undefined') {
+    var brandQs = KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[];
+    brandQs.forEach(function(q){
+      var val = b['k_'+q.name];
+      if (val) {
+        var radios = document.querySelectorAll('[name="'+q.name+'"]');
+        [].forEach.call(radios, function(r){ r.checked = (r.value===val); });
+      }
+    });
+    if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
+  }
+  checkKulanzNok();
 }
 
 document.addEventListener('input',  function(e) {
@@ -1182,6 +1215,10 @@ function envoyerFormulaire() {
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
       statut: 'En attente', commentaire_team: '', commerce: null
     };
+    // Conserver TOUS les champs du formulaire (plainte, emplacement, réponses KULANZ, codes séparés…)
+    (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in newD)) newD[k]=snap[k]; })(formSnapshot());
+    // Mode modification : réutiliser l'id et la date d'origine
+    if (G.editingId) { var _o=getDemandeById(G.editingId); if(_o){ newD.id=_o.id; newD.date=_o.date||newD.date; } }
     if (demandesRef) demandesRef.child('d'+newD.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD).catch(function(e){console.warn('Firebase CCR:',e);});
     else G.demandes.unshift(newD);
     try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
@@ -1237,49 +1274,58 @@ function envoyerFormulaire() {
   var msg = '\u2550'.repeat(40)+'\nDEMANDE '+d.type.toUpperCase()+' \u2014 '+d.site+'\n'+'\u2550'.repeat(40)+'\n\n';
   d.fields.filter(function(f){ return f.v; }).forEach(function(f){ msg += f.l+' : '+f.v+'\n'; });
   msg += '\n'+'\u2500'.repeat(40)+'\nTeam Garantie GEA \u2013 VW';
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: WEB3_KEY,
-      subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
-      message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(res){
-    if (!res.success) throw new Error('web3forms error');
-    var newD2 = {
-      id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
-      date: new Date().toLocaleDateString('fr-FR'),
-      site: d.site, type: d.type, or: gv('or_number'), chassis: gv('chassis'),
-      code_dommage: d.domFull,
-      desig_piece: ge('desig-val')?ge('desig-val').value:'',
-      rubrique: ge('rub-val')?ge('rub-val').value:'',
-      categorie: ge('dom-cat')?ge('dom-cat').value:'',
-      email_usager: email, conseiller_client: gv('conseiller_client'),
-      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
-      statut: 'En attente', commentaire_team: '', commerce: null
-    };
-    if (demandesRef) {
-    if (demandesRef) return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
-    return _pjK2.then(function(_u2){if(_u2.length)newD2.pieces_jointes=_u2;
-      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
-    }).catch(function(e){console.warn('PJ Kulanz:',e);
-      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
-    });}
-    G.demandes.unshift(newD2); return newD2;
-  })
-  .then(function(newD2){
+  // 1) Construire l'enregistrement (sauvegarde prioritaire, independante de l'e-mail)
+  var newD2 = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
+    date: new Date().toLocaleDateString('fr-FR'),
+    site: d.site, type: d.type, or: gv('or_number'), chassis: gv('chassis'),
+    code_dommage: d.domFull,
+    desig_piece: ge('desig-val')?ge('desig-val').value:'',
+    rubrique: ge('rub-val')?ge('rub-val').value:'',
+    categorie: ge('dom-cat')?ge('dom-cat').value:'',
+    email_usager: email, conseiller_client: gv('conseiller_client'),
+    kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+    statut: 'En attente', commentaire_team: '', commerce: null
+  };
+  // Conserver TOUS les champs du formulaire (plainte, emplacement, reponses KULANZ, codes separes...)
+  (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in newD2)) newD2[k]=snap[k]; })(formSnapshot());
+  // Mode modification : reutiliser l'id et la date d'origine
+  if (G.editingId) { var _o2=getDemandeById(G.editingId); if(_o2){ newD2.id=_o2.id; newD2.date=_o2.date||newD2.date; } }
+
+  // 2) Enregistrer dans Firebase EN PREMIER (source de verite)
+  var saveP;
+  if (demandesRef) {
+    saveP = demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
+  } else {
+    G.demandes.unshift(newD2);
+    saveP = Promise.resolve(newD2);
+  }
+
+  saveP.then(function(rec){
+    // 3) Notification "nouvelle demande" a la TeamGarantie -- en arriere-plan, NON bloquante.
+    //    Si l'envoi echoue (reseau, spam...), la demande reste enregistree.
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          access_key: WEB3_KEY,
+          subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
+          message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
+        })
+      }).catch(function(e){ console.warn('Notif TeamGarantie non envoyee:', e); });
+    } catch(e){ console.warn('Notif TeamGarantie:', e); }
+
+    // 4) Nettoyage brouillon + ecran de succes
     try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
+    G.editingId = null;
     ge('success-details').innerHTML =
-      '<strong>Site\u00a0:</strong> '+esc(newD2.site)+'<br>'+
-      '<strong>Type\u00a0:</strong> '+esc(newD2.type)+'<br>'+
-      '<strong>N\u00b0 OR\u00a0:</strong> '+esc(newD2.or)+'<br>'+
-      '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(newD2.chassis)+'<br>'+
-      '<strong>E-mail\u00a0:</strong> '+esc(newD2.email_usager);
+      '<strong>Site\u00a0:</strong> '+esc(rec.site)+'<br>'+
+      '<strong>Type\u00a0:</strong> '+esc(rec.type)+'<br>'+
+      '<strong>N\u00b0 OR\u00a0:</strong> '+esc(rec.or)+'<br>'+
+      '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(rec.chassis);
     ge('success-overlay').classList.add('open');
   })
-  .catch(function(err){ console.error(err); toast('\u274c Erreur \u2013 r\u00e9essayez.'); })
+  .catch(function(err){ console.error(err); toast('\u274c Erreur d\'enregistrement \u2013 reessayez.'); })
   .finally(function(){
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
@@ -1288,6 +1334,10 @@ function envoyerFormulaire() {
 
 function nouvelleDemande() {
   ge('success-overlay').classList.remove('open');
+  G.editingId = null;
+  clearReopenBanner();
+  var _bv=ge('btn-envoyer');
+  if(_bv){ var _svg=_bv.querySelector('svg'); _bv.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande'; }
   ge('mainForm').reset();
   ge('f-type').value = 'Kulanz';
   ssReset('dom'); ssReset('ava');
@@ -1425,9 +1475,9 @@ function renderHisto() {
       if(pts.length) pec='<div style="font-size:11px;line-height:1.7">'+pts.join('')+'</div>';
     }
     var action = G.role==='team'
-      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" onclick="openSPFromBtn(this)">Valider</button>'
-      : '—';
-    return '<tr>'+
+      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" onclick="event.stopPropagation();openSPFromBtn(this)">Valider</button>'
+      : '<span style="font-size:11px;color:var(--accent-d);font-weight:600">Ouvrir ›</span>';
+    return '<tr style="cursor:pointer" onclick="openDemande(\''+esc(String(d.id))+'\')" title="Cliquer pour rouvrir la demande">'+
       '<td>'+esc(d.date||'')+'</td>'+
       '<td style="font-weight:500">'+esc(d.site||'')+'</td>'+
       '<td><span style="font-size:11px;font-weight:600;color:var(--gold)">'+esc(d.type||'')+'</span></td>'+
@@ -1579,6 +1629,90 @@ function dashClick(el) {
 function openSPFromBtn(btn) {
   var id = btn.getAttribute('data-id');
   openSP(id);
+}
+
+// Retrouve une demande par id (compare en chaîne)
+function getDemandeById(id) {
+  for (var i = 0; i < G.demandes.length; i++) {
+    if (String(G.demandes[i].id) === String(id)) return G.demandes[i];
+  }
+  return null;
+}
+
+// Rouvre une demande depuis l'historique dans le formulaire.
+//  - "En attente" / "Complément requis" -> édition : l'envoi MET À JOUR la même demande.
+//  - "Traitée" / "Traitée sans participation" -> pré-rempli : l'envoi crée une NOUVELLE demande (duplication).
+function openDemande(id) {
+  var d = getDemandeById(id);
+  if (!d) { toast('⚠ Demande introuvable.'); return; }
+
+  var statut = d.statut || 'En attente';
+  var estFinalisee = (statut === 'Traitée' || statut === 'Traitée sans participation');
+
+  // Remettre le formulaire à zéro puis le repeupler
+  if (ge('mainForm')) ge('mainForm').reset();
+  G.editingId = null;
+  resetCat();
+  ssReset('dom'); ssReset('ava'); ssReset('rub'); ssResetDesig();
+  setType(d.type === 'CCR' ? 'C' : 'K');
+
+  fillFormFromRecord(d);
+
+  // Mode : duplication (finalisée) ou modification (en cours)
+  G.editingId = estFinalisee ? null : String(id);
+
+  // Aller sur l'onglet formulaire
+  showPage('form', ge('tab-form'));
+
+  // Bandeau d'information en haut du formulaire
+  showReopenBanner(estFinalisee, d);
+
+  // Mettre à jour le libellé du bouton d'envoi
+  var bv = ge('btn-envoyer');
+  if (bv) {
+    var lbl = estFinalisee ? 'Créer une nouvelle demande' : 'Mettre à jour la demande';
+    var svg = bv.querySelector('svg');
+    bv.innerHTML = (svg ? svg.outerHTML : '') + ' ' + lbl;
+  }
+
+  toast(estFinalisee ? '📄 Demande dupliquée — ajustez puis envoyez.' : '✏ Demande rouverte en modification.');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Affiche/actualise un bandeau au-dessus du formulaire
+function showReopenBanner(estFinalisee, d) {
+  var host = ge('mainForm');
+  if (!host) return;
+  var old = ge('reopen-banner'); if (old) old.remove();
+  var div = document.createElement('div');
+  div.id = 'reopen-banner';
+  if (estFinalisee) {
+    div.className = 'info-box';
+    div.style.cssText = 'background:var(--info-soft);border:1px solid var(--info-line);color:var(--info);margin-bottom:14px';
+    div.innerHTML = '📄 <strong>Duplication</strong> — basée sur la demande '
+      + esc(d.type||'') + ' du ' + esc(d.date||'') + ' (' + esc(d.statut||'') + '). '
+      + 'À l\'envoi, une <strong>nouvelle demande</strong> sera créée. '
+      + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--info);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+  } else {
+    div.className = 'info-box';
+    div.style.cssText = 'background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px';
+    div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
+      + ' (' + esc(d.statut||'') + '). À l\'envoi, cette demande sera <strong>mise à jour</strong>. '
+      + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+  }
+  host.insertBefore(div, host.firstChild);
+}
+
+function clearReopenBanner() {
+  var b = ge('reopen-banner'); if (b) b.remove();
+}
+
+// Annule la réouverture : repart sur un formulaire vierge
+function annulerReouverture() {
+  G.editingId = null;
+  clearReopenBanner();
+  if (typeof nouvelleDemande === 'function') nouvelleDemande();
+  toast('Réouverture annulée.');
 }
 
 function openSP(id) {
@@ -1749,45 +1883,10 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
 }
 
 
-function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
-  var ic = icons[statut] || '🔔';
-  var sep = Array(41).join('-');
-  var pecMsg = '';
-  if (statut==='Traitée' && commerce) {
-    pecMsg = '\n\nPrise en charge accordée :\n';
-    if(commerce.mo_de)  pecMsg += '- Main d oeuvre : '+commerce.mo_de+'%\n';
-    if(commerce.pi_de)  pecMsg += '- Pieces        : '+commerce.pi_de+'%\n';
-    if(commerce.moe_de) pecMsg += '- MO ext.       : '+commerce.moe_de+'%\n';
-    if(commerce.pe_de)  pecMsg += '- Pieces ext.   : '+commerce.pe_de+'%\n';
-    if(commerce.type_ext) pecMsg += '- Type ext.     : '+commerce.type_ext+'\n';
-  }
-  var body = 'Bonjour'+(d.conseiller_client?' '+d.conseiller_client:'')+',\n\n'
-    +'Votre demande '+d.type+' a ete traitee.\n\n'
-    +sep+'\nStatut : '+ic+' '+statut
-    +'\nSite : '+d.site
-    +'\nN OR : '+d.or
-    +'\nChassis : '+d.chassis
-    +(commentaire?'\nCommentaire : '+commentaire:'')
-    +pecMsg+'\n'+sep+'\n\n'
-    +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
-     :statut==='Traitée sans participation'?'Veuillez contacter la TeamGarantie.\n'
-     :'Un complement de dossier est necessaire.\n')
-    +'\nCordialement,\nTeam Garantie GEA - VW';
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: WEB3_KEY,
-      subject: ic+' Demande '+d.type+' '+statut+' - OR '+d.or,
-      message: body,
-      from_name: 'Team Garantie GEA - VW',
-      replyto: 'teamgarantie@geauto.fr'
-    })
-  })
-  .then(function() { toast('Email envoye.'); })
-  .catch(function() { toast('Statut OK mais email non envoye.'); });
-}
+// Notification de statut aux usagers : SUPPRIMÉE volontairement.
+// Aucune notification automatique n'est envoyée aux usagers (création ou validation).
+// Seule la TeamGarantie est notifiée des nouvelles demandes (Web3Forms / mailto).
+
 
 
 
