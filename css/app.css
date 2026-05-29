@@ -464,7 +464,7 @@ tbody tr:hover td{background:var(--bg2)}
    MODALES & OVERLAYS
    ════════════════════════════════════════════════ */
 #pwd-modal,#vider-modal,#success-overlay{position:fixed;inset:0;background:rgba(16,41,62,.5);z-index:800;display:none;align-items:center;justify-content:center;padding:20px}
-#pwd-modal.open,#vider-modal.open,#success-overlay.show{display:flex}
+#pwd-modal.open,#vider-modal.open,#success-overlay.open,#success-overlay.show{display:flex}
 .pm-box,.vm-box{background:#fff;border-radius:16px;padding:30px;width:100%;max-width:400px;box-shadow:var(--shadow-lg)}
 .pm-box h3{font-size:18px;font-weight:700;margin-bottom:6px;color:var(--ink)}
 .pm-box p{font-size:13px;color:var(--ink-soft);margin-bottom:18px}
