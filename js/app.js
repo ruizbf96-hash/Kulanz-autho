@@ -240,17 +240,7 @@ function vinHint(v) {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // LOGIN
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-function showStep2() {
-  ge('lp-step1').style.display = 'none';
-  ge('lp-step2').style.display = 'block';
-  // Montrer d'abord la sélection de site
-  if (ge('site-select-step')) ge('site-select-step').style.display = 'block';
-  if (ge('auth-form')) ge('auth-form').style.display = 'none';
-}
-function showStep1() {
-  ge('lp-step2').style.display = 'none';
-  ge('lp-step1').style.display = 'block';
-}
+// showStep1() / showStep2() sont definis dans index.html (gestion robuste des 3 etapes du login).
 function openPwdModal() {
   ge('pwd-modal').classList.add('open');
   setTimeout(function() { ge('pwd-input').focus(); }, 100);
@@ -1608,8 +1598,6 @@ function openSP(id) {
   if (stat) stat.value = d.statut || 'En attente';
   var cmt = ge('sp-comment');
   if (cmt) cmt.value = d.commentaire_team || '';
-  var pwd = ge('sp-pwd');
-  if (pwd) pwd.value = '';
   var err = ge('sp-pwd-err');
   if (err) err.style.display = 'none';
   var c = d.commerce || {};
@@ -1623,7 +1611,7 @@ function openSP(id) {
   onStatutChange();
   var spOv = ge('sp-overlay'); if(spOv) spOv.classList.add('open');
   var spPn = ge('side-panel'); if(spPn) spPn.classList.add('open');
-  setTimeout(function() { var p=ge('sp-pwd'); if(p) p.focus(); }, 350);
+  setTimeout(function() { var c=ge('sp-statut'); if(c) c.focus(); }, 350);
 }
 
 function closeSP() {
