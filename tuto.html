@@ -131,8 +131,8 @@ footer strong{color:var(--accent-d)}
       <li><a href="#demande">Créer une demande KULANZ</a></li>
       <li><a href="#codes">Choisir les codes (cascade)</a></li>
       <li><a href="#ccr">Faire une demande CCR</a></li>
-      <li><a href="#envoi">Envoyer &amp; enregistrer en PDF</a></li>
-      <li><a href="#team">Espace TeamGarantie</a></li>
+      <li><a href="#envoi">Envoyer la demande</a></li>
+      <li><a href="#mailauto">Ouvrir le mail automatiquement</a></li>
       <li><a href="#statuts">Les statuts</a></li>
       <li><a href="#faq">Questions fréquentes</a></li>
     </ol>
@@ -142,27 +142,18 @@ footer strong{color:var(--accent-d)}
   <section id="connexion">
     <div class="s-head"><div class="s-num">1</div><h2>Se connecter</h2></div>
     <div class="s-body">
-      <p>À l'ouverture, l'écran propose deux profils :</p>
-      <ul class="bul">
-        <li><strong>👤 Usager</strong> — pour créer et suivre les demandes de votre site.</li>
-        <li><strong>🛡️ TeamGarantie</strong> — pour valider les demandes et consulter l'historique de tous les sites.</li>
-      </ul>
-
-      <h3>En tant qu'usager</h3>
+      <p>À l'ouverture, cliquez sur le profil <strong>👤 Usager</strong>, puis :</p>
       <ol class="steps">
-        <li>Cliquez sur <strong>Usager</strong>.</li>
         <li>Sélectionnez votre <strong>site</strong> (Audi, SEAT, SKODA ou VW).</li>
         <li>Saisissez votre e-mail <strong>@geauto.fr</strong> et votre mot de passe, puis <span class="demo teal">Se connecter</span>.</li>
       </ol>
       <div class="note">Le <strong>KVPS</strong> et le nom du site se remplissent automatiquement selon le site choisi. Vous n'avez rien à ressaisir.</div>
 
-      <h3>En tant que TeamGarantie</h3>
-      <ol class="steps">
-        <li>Cliquez sur <strong>TeamGarantie</strong>.</li>
-        <li>Connectez-vous avec votre e-mail TeamGarantie et votre mot de passe.</li>
-      </ol>
-      <div class="warn">L'accès TeamGarantie est réservé aux comptes autorisés. Un compte usager standard ne peut pas y entrer ; pour être ajouté, contactez <strong>teamgarantie@geauto.fr</strong>.</div>
-      <p>Mot de passe oublié ? Utilisez le lien <strong>🔑 Mot de passe oublié ?</strong> : un e-mail de réinitialisation vous est envoyé.</p>
+      <h3>Mot de passe oublié</h3>
+      <p>Utilisez le lien <strong>🔑 Mot de passe oublié ?</strong> sur l'écran de connexion : un e-mail de réinitialisation vous est envoyé.</p>
+      <div class="warn">Vous ne recevez pas l'e-mail de réinitialisation ? Il est peut-être bloqué ou classé en <strong>spam</strong>. Vérifiez votre dossier courrier indésirable, puis si besoin écrivez à <strong>teamgarantie@geauto.fr</strong> pour obtenir de l'aide.</div>
+
+      <p>Pas encore de compte ? Contactez <strong>teamgarantie@geauto.fr</strong>.</p>
     </div>
   </section>
 
@@ -176,7 +167,7 @@ footer strong{color:var(--accent-d)}
       <ul class="bul">
         <li><strong>Numéro de châssis</strong> — 17 caractères. Il est contrôlé en direct (les lettres I, O, Q sont interdites). Un ✔ vert confirme un châssis valide.</li>
         <li><strong>Kilométrage</strong> et <strong>N° d'OR</strong> (6 chiffres).</li>
-        <li><strong>Date de l'OR</strong>, <strong>nom du demandeur</strong> et votre <strong>e-mail</strong> de suivi.</li>
+        <li><strong>Date de l'OR</strong>, <strong>nom du demandeur</strong> et votre <strong>e-mail</strong> (utilisé par la TeamGarantie pour vous recontacter si besoin).</li>
       </ul>
       <div class="tip">Si un véhicule a déjà fait l'objet d'une demande, commencez à taper le châssis : une <strong>suggestion</strong> apparaît et pré-remplit kilométrage, date, demandeur, e-mail…</div>
 
@@ -229,34 +220,54 @@ footer strong{color:var(--accent-d)}
 
   <!-- 5. Envoi -->
   <section id="envoi">
-    <div class="s-head"><div class="s-num">5</div><h2>Envoyer &amp; enregistrer en PDF</h2></div>
+    <div class="s-head"><div class="s-num">5</div><h2>Envoyer la demande</h2></div>
     <div class="s-body">
+      <p>Quand le formulaire est complet, cliquez sur <span class="demo teal">Envoyer la demande</span>. L'application vérifie les champs obligatoires puis enregistre la demande. Un écran de confirmation s'affiche : vous savez ainsi que la demande est bien partie.</p>
+
+      <h3>Pour une demande CCR : joindre les documents</h3>
+      <p>Après l'envoi d'une <strong>CCR</strong>, un e-mail pré-rempli vers <strong>teamgarantie@geauto.fr</strong> s'ouvre dans votre messagerie. Avant de cliquer sur « Envoyer » dans votre messagerie, <strong>joignez les documents justificatifs</strong> de votre dossier, par exemple :</p>
       <ul class="bul">
-        <li><span class="demo teal">Envoyer la demande</span> — vérifie les champs obligatoires puis enregistre la demande. Pour une <strong>CCR</strong>, un e-mail pré-rempli vers <strong>teamgarantie@geauto.fr</strong> s'ouvre dans votre messagerie ; il ne reste qu'à joindre le PDF et envoyer.</li>
-        <li><span class="demo ghost">Enregistrer en PDF</span> — génère un PDF récapitulatif de la demande, à conserver ou à joindre.</li>
+        <li>l'<strong>Ordre de Réparation (OR)</strong> ;</li>
+        <li>le <strong>devis</strong> au taux garantie ;</li>
+        <li>les <strong>factures d'entretien</strong> (réseau et/ou hors réseau) ;</li>
+        <li>le <strong>commentaire technicien</strong> / la feuille de diagnostic ;</li>
+        <li>le <strong>plan d'entretien ELSA</strong>, l'IQ, les photos/vidéos avec châssis, etc.</li>
       </ul>
-      <div class="note">Le sujet de l'e-mail CCR est normalisé : <em>« Demande CCR – KVPS – Site – Châssis – Demandeur »</em>, ce qui facilite le traitement.</div>
+      <div class="warn"><strong>Important :</strong> ces documents sont vos propres fichiers (PDF, photos…) à récupérer depuis vos outils habituels (SAGA, ELSA, scanner…). Ce ne sont <strong>pas</strong> le « PDF récapitulatif » que l'application peut générer : ce dernier n'est qu'un résumé de la saisie, il ne remplace pas les justificatifs.</div>
+
+      <h3>Le bouton « Enregistrer en PDF »</h3>
+      <p>Le bouton <span class="demo ghost">Enregistrer en PDF</span> crée un simple <strong>récapitulatif</strong> de ce que vous avez saisi, pratique pour archiver ou relire. Il ne contient aucun justificatif et n'est pas obligatoire.</p>
+
+      <div class="note">Le sujet de l'e-mail CCR est rempli automatiquement (Demande CCR – KVPS – Site – Châssis – Demandeur), ce qui aide la TeamGarantie à traiter votre dossier.</div>
       <div class="warn">Si un champ obligatoire manque (châssis, OR, plainte, désignation, code dommage, code avarie, nom, e-mail), un message vous l'indique et l'envoi est bloqué tant qu'il n'est pas corrigé.</div>
     </div>
   </section>
 
-  <!-- 6. TeamGarantie -->
-  <section id="team">
-    <div class="s-head"><div class="s-num">6</div><h2>Espace TeamGarantie</h2></div>
+  <!-- 6. Ouvrir le mail automatiquement -->
+  <section id="mailauto">
+    <div class="s-head"><div class="s-num">6</div><h2>Ouvrir le mail automatiquement (pré-rempli)</h2></div>
     <div class="s-body">
-      <p>Connecté en TeamGarantie, vous disposez en plus :</p>
-      <ul class="bul">
-        <li>D'une <strong>barre de sélection des sites</strong> et d'un <strong>tableau de bord</strong> indiquant, par site, le nombre de demandes en attente, validées et le total. Une pastille orange signale les sites avec des demandes en attente.</li>
-        <li>De l'onglet <span class="demo ghost">📋 Historique</span> donnant accès à toutes les demandes, avec filtres par type et par statut.</li>
-      </ul>
-      <h3>Valider une demande</h3>
+      <p>Pour une demande CCR, l'application ouvre un e-mail <strong>déjà pré-rempli</strong> vers teamgarantie@geauto.fr (destinataire, sujet, corps). Pour que cet e-mail s'ouvre tout seul dans <strong>Outlook</strong>, voici la configuration à faire une seule fois.</p>
+
+      <h3>Outlook classique (application installée sur le PC)</h3>
       <ol class="steps">
-        <li>Dans l'historique, cliquez sur <span class="demo teal">Valider</span> sur la ligne concernée.</li>
-        <li>Un panneau latéral s'ouvre : choisissez le <strong>statut</strong>, ajoutez un <strong>commentaire</strong>.</li>
-        <li>Si le statut est <strong>Traitée</strong>, renseignez le <strong>commerce de détail</strong> (% main d'œuvre, pièces, MO et pièces extérieures, type d'extension).</li>
-        <li>Cliquez sur <span class="demo teal">✔ Confirmer</span>. Pour un statut final, un e-mail de notification est préparé automatiquement.</li>
+        <li>Ouvrez <strong>Paramètres</strong> Windows (touche Windows + I).</li>
+        <li>Allez dans <strong>Applications</strong> → <strong>Applications par défaut</strong>.</li>
+        <li>Faites défiler jusqu'à <strong>« E-mail »</strong> (ou cherchez « E-mail » dans la barre de recherche).</li>
+        <li>Cliquez sur l'application affichée, puis sélectionnez <strong>Outlook</strong>.</li>
       </ol>
-      <div class="warn">Le bouton <span class="demo ghost">🗑 Vider</span> supprime <strong>définitivement</strong> les demandes du site sélectionné. L'action demande une confirmation par mot de passe et est <strong>irréversible</strong>.</div>
+      <div class="tip">Après ça, un clic sur « Envoyer » d'une CCR ouvre directement un nouveau message Outlook, pré-rempli. Il ne reste qu'à joindre vos documents et envoyer.</div>
+
+      <h3>Outlook web (outlook.office.com, dans le navigateur)</h3>
+      <p>Dans ce cas, c'est le navigateur (Edge ou Chrome) qui doit être autorisé à ouvrir les liens e-mail avec Outlook web.</p>
+      <ol class="steps">
+        <li>Connectez-vous à <strong>Outlook web</strong> (outlook.office.com) dans Edge ou Chrome.</li>
+        <li>Cliquez une fois sur « Envoyer » dans l'application : une petite icône (en forme de <strong>losange</strong> ou de fenêtre) apparaît à droite de la barre d'adresse.</li>
+        <li>Cliquez dessus, choisissez <strong>Autoriser</strong> Outlook à ouvrir les liens e-mail, puis <strong>Terminé</strong>.</li>
+      </ol>
+      <div class="note">Réglage manuel si l'icône n'apparaît pas — <strong>Edge</strong> : menu <strong>…</strong> → Paramètres → Cookies et autorisations de site → <strong>Gestionnaires de protocole</strong> → autoriser les liens « mailto » pour Outlook. <strong>Chrome</strong> : menu <strong>⋮</strong> → Paramètres → Confidentialité et sécurité → Paramètres des sites → <strong>Gestionnaires de protocole</strong>, puis autorisez Outlook.</div>
+
+      <div class="warn">Si l'e-mail ne s'ouvre toujours pas : copiez l'adresse <strong>teamgarantie@geauto.fr</strong>, créez un e-mail manuellement dans Outlook et joignez vos documents. La demande est de toute façon déjà enregistrée dans l'application.</div>
     </div>
   </section>
 
@@ -285,20 +296,26 @@ footer strong{color:var(--accent-d)}
     <div class="s-head"><div class="s-num">8</div><h2>Questions fréquentes</h2></div>
     <div class="s-body">
       <dl class="faq">
-        <dt>Le menu de code avarie / dommage ne s'ouvre pas entièrement ?</dt>
+        <dt>Je ne reçois pas l'e-mail de réinitialisation du mot de passe.</dt>
+        <dd>Vérifiez d'abord votre dossier <strong>spam / courrier indésirable</strong> : l'e-mail y est souvent classé. S'il reste introuvable au bout de quelques minutes, écrivez à <strong>teamgarantie@geauto.fr</strong> — il est possible que l'e-mail soit bloqué côté messagerie, l'équipe pourra vous aider à réinitialiser votre accès.</dd>
+
+        <dt>Le menu de code avarie / dommage ne s'ouvre pas entièrement.</dt>
         <dd>Videz le cache de votre navigateur (Ctrl + Maj + R) pour charger la dernière version. Le menu doit s'afficher complet, par-dessus la section suivante.</dd>
 
-        <dt>Mon e-mail @geauto.fr est refusé à la connexion usager.</dt>
-        <dd>S'il s'agit d'un compte TeamGarantie, utilisez le bouton « TeamGarantie ». Sinon, vérifiez l'orthographe ; en cas d'oubli du mot de passe, utilisez « Mot de passe oublié ? ».</dd>
+        <dt>L'e-mail CCR ne s'ouvre pas tout seul après l'envoi.</dt>
+        <dd>Votre messagerie par défaut n'est probablement pas configurée. Voir la section <a href="#mailauto">« Ouvrir le mail automatiquement »</a>. En dernier recours, écrivez manuellement à <strong>teamgarantie@geauto.fr</strong> en joignant vos documents : la demande est déjà enregistrée dans l'application.</dd>
+
+        <dt>Quels documents dois-je joindre à une CCR ?</dt>
+        <dd>Vos justificatifs : OR, devis au taux garantie, factures d'entretien, commentaire technicien, plan ELSA, IQ, photos avec châssis… Ce ne sont pas le « PDF récapitulatif » de l'application, mais vos propres fichiers.</dd>
+
+        <dt>Mon e-mail @geauto.fr est refusé à la connexion.</dt>
+        <dd>Vérifiez l'orthographe exacte de votre adresse. En cas d'oubli du mot de passe, utilisez « 🔑 Mot de passe oublié ? ». Si le problème persiste, contactez <strong>teamgarantie@geauto.fr</strong>.</dd>
 
         <dt>La cascade ne propose pas le bon code.</dt>
         <dd>Utilisez la recherche par libellé, ou la <strong>saisie manuelle</strong> en bas de chaque liste.</dd>
 
-        <dt>Je ne vois pas l'onglet Historique.</dt>
-        <dd>L'historique complet et la validation sont réservés au profil <strong>TeamGarantie</strong>.</dd>
-
-        <dt>Comment ajouter un membre à TeamGarantie ?</dt>
-        <dd>Contactez <strong>teamgarantie@geauto.fr</strong> pour ajouter l'adresse à la liste des comptes autorisés.</dd>
+        <dt>Comment retrouver / rouvrir une demande déjà créée ?</dt>
+        <dd>Dans l'onglet <span class="demo ghost">📋 Historique</span>, cliquez sur la ligne de la demande. Si elle est encore « En attente », vous pouvez la modifier ; si elle est déjà traitée, elle s'ouvre pré-remplie pour créer rapidement une nouvelle demande similaire.</dd>
       </dl>
       <div class="note">Une question non couverte ici ? Écrivez à <strong>teamgarantie@geauto.fr</strong>.</div>
     </div>
