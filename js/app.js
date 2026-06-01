@@ -349,6 +349,32 @@ function ouvrirApp() {
   restoreDraft();
 }
 
+// Permet à l'utilisateur CONNECTÉ de changer lui-même son mot de passe.
+function changerMonMdp() {
+  var user = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!user) { toast('⚠ Vous devez être connecté.'); return; }
+
+  var p1 = prompt('Nouveau mot de passe (6 caractères minimum) :');
+  if (p1 === null) return;                 // annulé
+  p1 = (p1 || '').trim();
+  if (p1.length < 6) { alert('Le mot de passe doit contenir au moins 6 caractères.'); return; }
+  var p2 = prompt('Confirmez le nouveau mot de passe :');
+  if (p2 === null) return;
+  if (p1 !== (p2 || '').trim()) { alert('Les deux mots de passe ne correspondent pas.'); return; }
+
+  user.updatePassword(p1)
+    .then(function(){ alert('✅ Mot de passe mis à jour avec succès.'); })
+    .catch(function(e){
+      if (e && e.code === 'auth/requires-recent-login') {
+        alert('Pour des raisons de sécurité, veuillez vous déconnecter puis vous reconnecter, et réessayer immédiatement après.');
+      } else if (e && e.code === 'auth/weak-password') {
+        alert('Mot de passe trop faible (6 caractères minimum).');
+      } else {
+        alert('⚠️ Erreur : ' + (e && e.message ? e.message : 'réessayez.'));
+      }
+    });
+}
+
 function deconnecter() {
   deconnecterUsager();
   G.role = ''; G.site = ''; G.fbListening = false;
@@ -2420,4 +2446,3 @@ function checkKulanzNok() {
     initFirebase(); // Firebase initialisé dès le chargement
   }
 })();
-
