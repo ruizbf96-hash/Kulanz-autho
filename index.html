@@ -96,13 +96,13 @@
           Se connecter
         </button>
         <button class="lp-back" onclick="retourSiteSelect()">← Retour</button>
-        <div style="text-align:center;margin-top:10px">
-          <button onclick="resetPassword('usager')" type="button"
-            style="background:none;border:none;color:rgba(57,201,168,.85);font-size:11px;cursor:pointer;text-decoration:underline;padding:0">
+        <div style="text-align:center;margin-top:12px">
+          <button onclick="demandeResetMdp()" type="button"
+            style="background:none;border:none;color:rgba(57,201,168,.9);font-size:12px;cursor:pointer;text-decoration:underline;padding:0">
             🔑 Mot de passe oublié ?
           </button>
         </div>
-        <p style="color:rgba(255,255,255,.32);font-size:10px;text-align:center;margin-top:8px">
+        <p style="color:rgba(255,255,255,.35);font-size:10px;text-align:center;margin-top:8px">
           Compte inexistant ? Contactez <strong style="color:var(--mint)">teamgarantie@geauto.fr</strong>
         </p>
       </div>
@@ -131,10 +131,7 @@
         Se connecter
       </button>
       <div style="text-align:center;margin-top:10px">
-        <button onclick="resetPassword('team')" type="button"
-          style="background:none;border:none;color:rgba(57,201,168,.85);font-size:11px;cursor:pointer;text-decoration:underline;padding:0">
-          🔑 Mot de passe oublié ?
-        </button>
+        <span style="color:rgba(255,255,255,.35);font-size:10px">Mot de passe oublié ? Réinitialisation via la console Firebase.</span>
       </div>
       <button class="lp-back" onclick="retourStep1Team()">← Retour</button>
     </div>
@@ -191,6 +188,9 @@
       </div>
       <div class="h-user" id="h-user">
         <span class="h-role" id="h-role"></span>
+        <button class="btn-logout" onclick="changerMonMdp()" title="Changer mon mot de passe" style="border-color:var(--accent-line);color:var(--accent-d)">
+          🔑 Mot de passe
+        </button>
         <button class="btn-logout" onclick="deconnecter()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Déconnexion
@@ -801,23 +801,40 @@ function connecterTeam() {
     });
 }
 
-function resetPassword(type) {
-  var emailId = (type === 'team') ? 'team-email' : 'auth-email';
-  var email = (document.getElementById(emailId) ? document.getElementById(emailId).value : '').trim();
-  if (!email) { alert('Saisissez votre e-mail avant de réinitialiser le mot de passe.'); return; }
-  if (!firebase.apps || !firebase.apps.length) {
-    if (typeof initFirebase === 'function') initFirebase();
-  }
-  firebase.auth().sendPasswordResetEmail(email)
-    .then(function() {
-      alert('✉️ Un lien de réinitialisation a été envoyé à ' + email + '\nVérifiez votre boîte mail.');
+// La réinitialisation du mot de passe se fait manuellement par la TeamGarantie
+// (console Firebase). Aucune réinitialisation par e-mail automatique Firebase n'est utilisée.
+
+// "Mot de passe oublié ?" : envoie une DEMANDE de réinitialisation à la TeamGarantie
+// (via Web3Forms, comme la notif de nouvelle demande). La TeamGarantie réinitialise ensuite manuellement.
+function demandeResetMdp() {
+  var email = (document.getElementById('auth-email') ? document.getElementById('auth-email').value : '').trim();
+  var site  = (typeof G !== 'undefined' && G.site) ? G.site : '';
+  if (!email) { alert('Saisissez d\'abord votre e-mail @geauto.fr, puis cliquez sur « Mot de passe oublié ? ».'); var ae=document.getElementById('auth-email'); if(ae) ae.focus(); return; }
+  if (!email.toLowerCase().endsWith('@geauto.fr')) { alert('Utilisez votre e-mail @geauto.fr.'); return; }
+
+  if (!confirm('Envoyer une demande de réinitialisation de mot de passe à la TeamGarantie pour :\n\n' + email + (site ? '\n(site : ' + site + ')' : '') + ' ?')) return;
+
+  var KEY = (typeof WEB3_KEY !== 'undefined') ? WEB3_KEY : '7bf5b927-e39f-4fc1-9f60-642e4741e445';
+  var corps = 'DEMANDE DE RÉINITIALISATION DE MOT DE PASSE\n'
+    + '----------------------------------------\n'
+    + 'Compte concerné : ' + email + '\n'
+    + (site ? 'Site : ' + site + '\n' : '')
+    + 'Date : ' + new Date().toLocaleString('fr-FR') + '\n\n'
+    + 'Merci de réinitialiser le mot de passe de ce compte dans la console Firebase\n'
+    + '(Authentication > Users), puis de communiquer le nouveau mot de passe à l\'utilisateur.';
+
+  fetch('https://api.web3forms.com/submit', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      access_key: KEY,
+      subject: '[RESET MDP] Demande de réinitialisation – ' + email,
+      message: corps,
+      from_name: 'Réinitialisation mot de passe',
+      replyto: email
     })
-    .catch(function(e) {
-      var msg = 'Erreur lors de l\'envoi.';
-      if (e.code === 'auth/user-not-found') msg = 'Aucun compte trouvé pour cet e-mail.';
-      if (e.code === 'auth/invalid-email')  msg = 'Format e-mail invalide.';
-      alert('⚠️ ' + msg);
-    });
+  })
+  .then(function(){ alert('✅ Votre demande a été transmise à la TeamGarantie.\nVous serez recontacté avec un nouveau mot de passe.'); })
+  .catch(function(){ alert('⚠️ Envoi impossible pour le moment.\nContactez directement teamgarantie@geauto.fr.'); });
 }
 
 function retourStep1Team() {
