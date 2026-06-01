@@ -2,7 +2,12 @@
 
 var SITES     = ['Audi Hœnheim','Audi Obernai','SEAT Hœnheim','SEAT Illkirch','SKODA Hœnheim','SKODA Obernai','VW Bischheim','VW Illkirch','VW Obernai'];
 var KVPS_MAP  = {'Audi Hœnheim':'02155','Audi Obernai':'02486','SEAT Hœnheim':'63930','SEAT Illkirch':'02153','SKODA Hœnheim':'02376','SKODA Obernai':'02485','VW Bischheim':'02154','VW Illkirch':'02153','VW Obernai':'02485'};
-var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MOT DE PASSE POUR VIDER L'HISTORIQUE                          ║
+// ║  Pour le changer : remplacez la valeur entre apostrophes       ║
+// ║  ci-dessous, puis ré-uploadez js/app.js sur GitHub.            ║
+// ╚═══════════════════════════════════════════════════════════════╝
+var MOT_DE_PASSE = 'Garantie2026';
 
 // ═══════════════════════════════════════════════════
 // LISTE BLANCHE TeamGarantie
