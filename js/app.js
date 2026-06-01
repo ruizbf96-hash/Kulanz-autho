@@ -358,7 +358,7 @@ function deconnecter() {
   if (!document.querySelector('style[data-antiflash]')) {
     var s=document.createElement('style');
     s.setAttribute('data-antiflash','1');
-    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;background:#0f1923!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
+    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
     document.head.appendChild(s);
   }
   ge('login-page').classList.remove('hidden');
