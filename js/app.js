@@ -1250,7 +1250,7 @@ function envoyerFormulaire() {
       corps += 'Factures fournies: ' + (_pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune') + '\n';
     }
     corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
-    corps += 'Devis taux garantie: ' + (document.querySelector('[name="pieces[]"][value="Devis au taux garantie"]:checked')?'oui':'non') + '\n';
+    corps += 'Devis : ' + (document.querySelector('[name="pieces[]"][value="Devis"]:checked')?'oui':'non') + '\n';
     corps += 'Feuille Commentaire Technicien: ' + (document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked')?'oui':'non') + '\n\n';
     corps += '--- ETAPES ---\n';
     corps += '1. Joindre le PDF Demande CCR\n';
