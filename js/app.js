@@ -1971,6 +1971,9 @@ function selectCat(btn) {
   if (hint) { hint.textContent = '✔ ' + cat; hint.className = 'hint ok'; }
   // Reset toute la cascade sous catégorie
   resetBelow('cat');
+  // Réévaluer les critères entretien (bloquants pour Moto/Transmission) + bandeau
+  updateEntretienBanner();
+  checkKulanzNok();
   toast('✔ ' + cat);
 }
 
@@ -2003,6 +2006,8 @@ function catManualConfirm() {
   [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){ b.classList.remove('active'); });
   var manBtn = document.querySelector('.cat-btn.manual'); if(manBtn) manBtn.classList.add('active');
   resetCascadeBelow('cat');
+  updateEntretienBanner();
+  checkKulanzNok();
   toast('✔ Catégorie "'+cat+'" définie');
 }
 
@@ -2184,6 +2189,11 @@ function renderKulanzForm(site) {
   if (title) title.textContent = 'V\u00e9rifications KULANZ \u2014 ' + brand;
 
   var html = '';
+  // Bandeau permanent : rappel entretien
+  html += '<div id="entretien-banner" class="info-box" style="background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px;font-weight:600">'
+    + '\u26a0\ufe0f Sous r\u00e9serve que l\'entretien soit \u00e0 jour.'
+    + '<span id="entretien-banner-extra" style="display:none;font-weight:400"><br>Cat\u00e9gorie soumise \u00e0 l\'entretien : les pr\u00e9conisations constructeur, le dernier entretien et l\'absence de lien dommage/entretien sont des crit\u00e8res <strong>bloquants</strong> pour cette demande.</span>'
+    + '</div>';
   questions.forEach(function(q, idx) {
 
     // ── TPI ──
@@ -2254,6 +2264,7 @@ function renderKulanzForm(site) {
   });
 
   zone.innerHTML = html;
+  updateEntretienBanner();
 
   var alertZone = ge('kulanz-nok-alert');
   if (alertZone) { alertZone.classList.remove('show'); alertZone.innerHTML = ''; }
@@ -2285,6 +2296,19 @@ var BRAND_TEXTS = {
   }
 };
 
+// Vrai si la catégorie sélectionnée est soumise au critère entretien (Motopropulseur / Transmission)
+function isEntretienCategory() {
+  var cat = ge('dom-cat') ? (ge('dom-cat').value || '') : '';
+  cat = cat.toLowerCase();
+  return cat.indexOf('motopropulseur') !== -1 || cat.indexOf('transmission') !== -1;
+}
+
+// Affiche/masque la précision "critères bloquants" du bandeau selon la catégorie
+function updateEntretienBanner() {
+  var extra = ge('entretien-banner-extra');
+  if (extra) extra.style.display = isEntretienCategory() ? 'inline' : 'none';
+}
+
 function checkKulanzNok() {
   var zone = ge('kulanz-nok-alert');
   if (!zone) return;
@@ -2293,10 +2317,16 @@ function checkKulanzNok() {
   var brand  = SITE_BRAND[site] || 'VW';
   var questions = KULANZ_BY_BRAND[brand] || KULANZ_BY_BRAND['VW'];
 
+  // Les critères liés à l'entretien ne sont BLOQUANTS que pour Motopropulseur / Transmission
+  var entretienNames = ['preconisations','dernier_entretien','dernier_entretien_audi','entretien_moment','lien_entretien'];
+  var catEntretien = isEntretienCategory();
+
   // Collecter les réponses et détecter les NOK
   var reasons = [];
   questions.forEach(function(q) {
     if (!q.nok) return;
+    // Si la question est liée à l'entretien et que la catégorie n'est pas Moto/Transmission, on ne bloque pas dessus
+    if (entretienNames.indexOf(q.name) !== -1 && !catEntretien) return;
     var val = gr(q.name);
     if (q.nok && val === q.nok && val !== 'NC') {
       reasons.push(q.info || q.label);
