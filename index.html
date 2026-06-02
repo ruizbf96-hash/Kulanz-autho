@@ -462,15 +462,44 @@
       <div class="f-body">
         <div class="chk-list">
           <label class="chk-item"><input type="checkbox" name="pieces[]" value="Devis au taux garantie"><span class="chk-item-txt"><strong>Devis au taux garantie</strong> – sans forfait, sans diagnostic</span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Accord Technique Préalable"><span class="chk-item-txt"><strong>Accord Technique Préalable</strong> – si nécessaire</span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Photo/vidéo avec châssis"><span class="chk-item-txt"><strong>Photo ou vidéo</strong> avec châssis visible (ServiceCam)</span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Plan entretien ELSA"><span class="chk-item-txt"><strong>Plan d'entretien numérique ELSA</strong></span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Factures entretien réseau"><span class="chk-item-txt"><strong>Factures d'entretien – réseau</strong></span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Factures entretien hors réseau"><span class="chk-item-txt"><strong>Factures d'entretien – hors réseau</strong></span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="IQ avec plainte client"><span class="chk-item-txt"><strong>IQ</strong> avec plainte client et codage</span></label>
+        </div>
+
+        <div class="divider" style="margin:14px 0"></div>
+
+        <!-- Plan d'entretien ELSA : Oui / Non -->
+        <div class="field">
+          <label>Plan d'entretien numérique ELSA disponible ? <span class="req">*</span></label>
+          <div class="radio-g" style="gap:16px;margin-top:6px">
+            <label class="r-item"><input type="radio" name="elsa_dispo" value="OUI" onchange="onElsaChange()"> Oui</label>
+            <label class="r-item"><input type="radio" name="elsa_dispo" value="NON" onchange="onElsaChange()"> Non</label>
+          </div>
+        </div>
+
+        <!-- Bloc factures : affiché si ELSA = Non -->
+        <div id="factures-wrap" style="display:none;margin-top:12px">
+          <div class="info-box" style="background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:10px">
+            Plan ELSA indisponible : merci de fournir les <strong>factures d'entretien</strong>.
+          </div>
+          <div class="chk-list">
+            <label class="chk-item"><input type="checkbox" name="pieces[]" value="Factures entretien réseau"><span class="chk-item-txt"><strong>Factures d'entretien – réseau</strong></span></label>
+            <label class="chk-item"><input type="checkbox" name="pieces[]" value="Factures entretien hors réseau"><span class="chk-item-txt"><strong>Factures d'entretien – hors réseau</strong></span></label>
+          </div>
+          <span class="hint" style="margin-top:6px">Si aucune facture, vous pouvez tout de même continuer.</span>
+        </div>
+
+        <div class="divider" style="margin:14px 0"></div>
+
+        <!-- IQ n° : 9 chiffres obligatoire -->
+        <div class="field">
+          <label>IQ n° <span class="req">*</span></label>
+          <input type="text" id="iq-num" name="iq_num" inputmode="numeric" maxlength="9" placeholder="9 chiffres" oninput="onIqInput(this)">
+          <span class="hint" id="iq-hint">0 / 9 chiffres</span>
+        </div>
+
+        <div class="divider" style="margin:14px 0"></div>
+
+        <div class="chk-list">
           <label class="chk-item"><input type="checkbox" name="pieces[]" value="Feuille Commentaire Technicien"><span class="chk-item-txt"><strong>Feuille Commentaire Technicien</strong> avec diagnostic</span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Protocole en ligne"><span class="chk-item-txt"><strong>Protocole en ligne</strong> avec plan de contrôle</span></label>
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Contrôle codes garantie"><span class="chk-item-txt"><strong>Contrôle des codes de garantie</strong> (TD1, …)</span></label>
         </div>
       </div>
     </div>
