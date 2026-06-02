@@ -436,8 +436,11 @@ function setType(t) {
   else {
     // Reset champs CCR
     [].forEach.call(document.querySelectorAll('[name="pieces[]"]'), function(cb) { cb.checked = false; });
-    [].forEach.call(document.querySelectorAll('[name="kulanz_done"],[name="cig"]'), function(r) { r.checked = false; });
+    [].forEach.call(document.querySelectorAll('[name="kulanz_done"],[name="cig"],[name="elsa_dispo"]'), function(r) { r.checked = false; });
     var ct = ge('cig-taux'); if (ct) { ct.value = ''; ct.disabled = true; }
+    var iqEl = ge('iq-num'); if (iqEl) { iqEl.value = ''; iqEl.className=''; }
+    var iqH = ge('iq-hint'); if (iqH) { iqH.textContent = '0 / 9 chiffres'; iqH.className='hint'; }
+    var fw = ge('factures-wrap'); if (fw) fw.style.display = 'none';
   }
   ge('btn-k').classList.toggle('active', isK);
   // Afficher/cacher la case engagement CCR
@@ -866,6 +869,24 @@ function onOR(input) {
   input.className = v.length===6 ? 'ok' : v.length ? 'invalid' : '';
 }
 
+// CCR : affiche le bloc Factures uniquement si le plan ELSA n'est pas disponible
+function onElsaChange() {
+  var val = gr('elsa_dispo');
+  var wrap = ge('factures-wrap');
+  if (wrap) wrap.style.display = (val === 'NON') ? 'block' : 'none';
+  saveDraft();
+}
+
+// CCR : IQ n° = 9 chiffres
+function onIqInput(input) {
+  var v = input.value.replace(/\D/g,'').slice(0,9);
+  input.value = v;
+  var hint = ge('iq-hint');
+  if (hint) { hint.textContent = v.length+' / 9 chiffres'; hint.className = 'hint'+(v.length===9?' ok':v.length?' err':''); }
+  input.className = v.length===9 ? 'ok' : v.length ? 'invalid' : '';
+  saveDraft();
+}
+
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // KULANZ SAVE / COPY
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -964,6 +985,8 @@ function formSnapshot() {
     ? (KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]) : [];
   _q.forEach(function(q){ b['k_'+q.name] = gr(q.name) || ''; });
   b.num_tpi = gv('num_tpi') || '';
+  b.iq_num = gv('iq_num') || '';
+  b.elsa_dispo = gr('elsa_dispo') || '';
   return b;
 }
 
@@ -1085,6 +1108,11 @@ function fillFormFromRecord(b) {
     });
     if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
   }
+  // CCR : IQ + plan ELSA
+  if (b.iq_num) { sv('iq_num', b.iq_num); var iqEl=ge('iq-num'); if(iqEl) onIqInput(iqEl); }
+  if (b.elsa_dispo) {
+    var er=document.querySelector('[name="elsa_dispo"][value="'+b.elsa_dispo+'"]'); if(er){ er.checked=true; onElsaChange(); }
+  }
   checkKulanzNok();
 }
 
@@ -1172,6 +1200,15 @@ function envoyerFormulaire() {
   var email = gv('email_usager');
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { alert('\u26a0 E-mail invalide.'); return; }
   if (isCCR) {
+    if (!gr('elsa_dispo')) {
+      alert('\u26a0 Indiquez si le plan d\'entretien ELSA est disponible (Oui/Non).');
+      return;
+    }
+    if (!/^\d{9}$/.test(gv('iq_num'))) {
+      alert('\u26a0 Le num\u00e9ro IQ est obligatoire (9 chiffres).');
+      var iqEl = ge('iq-num'); if (iqEl) iqEl.focus();
+      return;
+    }
     var chkE = ge('chk-engagement');
     if (!chkE || !chkE.checked) {
       alert('\u26a0 Veuillez cocher la case d\u2019engagement avant d\u2019envoyer.');
@@ -1206,6 +1243,15 @@ function envoyerFormulaire() {
     corps += 'Code dommage: ' + (ge('dom-val')?ge('dom-val').value:'') + '\n';
     corps += 'Code avarie: ' + (ge('ava-val')?ge('ava-val').value:'') + '\n';
     corps += 'Emplacement: ' + (gv('emplacement')||'') + '\n\n';
+    corps += 'PIECES A FOURNIR:\n';
+    corps += 'Plan ELSA disponible: ' + (gr('elsa_dispo')||'-') + '\n';
+    if (gr('elsa_dispo') === 'NON') {
+      var _pcs = []; [].forEach.call(document.querySelectorAll('[name="pieces[]"]:checked'), function(el){ _pcs.push(el.value); });
+      corps += 'Factures fournies: ' + (_pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune') + '\n';
+    }
+    corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
+    corps += 'Devis taux garantie: ' + (document.querySelector('[name="pieces[]"][value="Devis au taux garantie"]:checked')?'oui':'non') + '\n';
+    corps += 'Feuille Commentaire Technicien: ' + (document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked')?'oui':'non') + '\n\n';
     corps += '--- ETAPES ---\n';
     corps += '1. Joindre le PDF Demande CCR\n';
     corps += '2. Joindre les documents justificatifs\n';
