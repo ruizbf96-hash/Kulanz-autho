@@ -1251,7 +1251,7 @@ function envoyerFormulaire() {
       corps += 'Factures fournies: ' + (_pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune') + '\n';
     }
     corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
-    corps += 'Devis taux garantie: ' + (document.querySelector('[name="pieces[]"][value="Devis au taux garantie"]:checked')?'oui':'non') + '\n';
+    corps += 'Devis: ' + (document.querySelector('[name="pieces[]"][value="Devis"]:checked')?'oui':'non') + '\n';
     corps += 'Feuille Commentaire Technicien: ' + (document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked')?'oui':'non') + '\n\n';
     corps += '--- ETAPES ---\n';
     corps += '1. Joindre le PDF Demande CCR\n';
@@ -1569,8 +1569,14 @@ function renderHisto() {
       if(c.pe_de)  pts.push('<span>Pièces ext.: '+esc(c.pe_de)+'%</span>');
       if(pts.length) pec='<div style="font-size:11px;line-height:1.7">'+pts.join('')+'</div>';
     }
+    var _traitee = (d.statut === 'Traitée' || d.statut === 'Traitée sans participation');
+    var _btnLabel = _traitee ? '✓ Validée'
+      : (d.statut === 'Complément requis' ? 'À compléter' : 'Valider');
+    var _btnStyle = _traitee
+      ? 'background:var(--green,#0B7A6E);'
+      : (d.statut === 'Complément requis' ? 'background:var(--amber,#B26A00);' : '');
     var action = G.role==='team'
-      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" onclick="event.stopPropagation();openSPFromBtn(this)">Valider</button>'
+      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" style="'+_btnStyle+'" onclick="event.stopPropagation();openSPFromBtn(this)">'+_btnLabel+'</button>'
       : '<span style="font-size:11px;color:var(--accent-d);font-weight:600">Ouvrir ›</span>';
     return '<tr style="cursor:pointer" onclick="openDemande(\''+esc(String(d.id))+'\')" title="Cliquer pour rouvrir la demande">'+
       '<td>'+esc(d.date||'')+'</td>'+
