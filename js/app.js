@@ -1250,7 +1250,7 @@ function envoyerFormulaire() {
       corps += 'Factures fournies: ' + (_pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune') + '\n';
     }
     corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
-    corps += 'Devis : ' + (document.querySelector('[name="pieces[]"][value="Devis"]:checked')?'oui':'non') + '\n';
+    corps += 'Devis taux garantie: ' + (document.querySelector('[name="pieces[]"][value="Devis au taux garantie"]:checked')?'oui':'non') + '\n';
     corps += 'Feuille Commentaire Technicien: ' + (document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked')?'oui':'non') + '\n\n';
     corps += '--- ETAPES ---\n';
     corps += '1. Joindre le PDF Demande CCR\n';
@@ -2235,10 +2235,10 @@ function renderKulanzForm(site) {
   if (title) title.textContent = 'V\u00e9rifications KULANZ \u2014 ' + brand;
 
   var html = '';
-  // Bandeau permanent : rappel entretien
-  html += '<div id="entretien-banner" class="info-box" style="background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px;font-weight:600">'
+  // Bandeau entretien : MASQUÉ par défaut, affiché uniquement pour Motopropulseur / Transmission
+  html += '<div id="entretien-banner" class="info-box" style="display:none;background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px;font-weight:600">'
     + '\u26a0\ufe0f Sous r\u00e9serve que l\'entretien soit \u00e0 jour.'
-    + '<span id="entretien-banner-extra" style="display:none;font-weight:400"><br>Cat\u00e9gorie soumise \u00e0 l\'entretien : les pr\u00e9conisations constructeur, le dernier entretien et l\'absence de lien dommage/entretien sont des crit\u00e8res <strong>bloquants</strong> pour cette demande.</span>'
+    + '<span style="font-weight:400"><br>Cat\u00e9gorie soumise \u00e0 l\'entretien : les pr\u00e9conisations constructeur, le dernier entretien et l\'absence de lien dommage/entretien sont des crit\u00e8res <strong>bloquants</strong> pour cette demande.</span>'
     + '</div>';
   questions.forEach(function(q, idx) {
 
@@ -2349,10 +2349,10 @@ function isEntretienCategory() {
   return cat.indexOf('motopropulseur') !== -1 || cat.indexOf('transmission') !== -1;
 }
 
-// Affiche/masque la précision "critères bloquants" du bandeau selon la catégorie
+// Affiche le bandeau entretien uniquement pour Motopropulseur / Transmission
 function updateEntretienBanner() {
-  var extra = ge('entretien-banner-extra');
-  if (extra) extra.style.display = isEntretienCategory() ? 'inline' : 'none';
+  var banner = ge('entretien-banner');
+  if (banner) banner.style.display = isEntretienCategory() ? 'block' : 'none';
 }
 
 function checkKulanzNok() {
