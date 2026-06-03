@@ -461,7 +461,7 @@
       <div class="f-head"><div class="f-num">4</div><div class="f-title">Pièces à fournir</div></div>
       <div class="f-body">
         <div class="chk-list">
-          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Devis"><span class="chk-item-txt"><strong>Devis</strong> – sans forfait, sans diagnostic</span></label>
+          <label class="chk-item"><input type="checkbox" name="pieces[]" value="Devis au taux garantie"><span class="chk-item-txt"><strong>Devis au taux garantie</strong> – sans forfait, sans diagnostic</span></label>
         </div>
 
         <div class="divider" style="margin:14px 0"></div>
@@ -565,12 +565,17 @@
     <div class="histo-head">
       <div class="histo-title">Historique des demandes</div>
       <div class="histo-filters">
-        <select id="f-type-sel" onchange="renderHisto()"><option value="">Tous types</option><option>Kulanz</option><option>CCR</option></select>
         <select id="f-stat-sel" onchange="renderHisto()">
           <option value="">Tous statuts</option><option>En attente</option><option>Traitée</option><option>Traitée sans participation</option><option>Complément requis</option>
         </select>
         <button class="btn-vider" id="btn-vider-histo" onclick="viderHistorique()" style="display:none">🗑 Vider</button>
       </div>
+    </div>
+    <div class="histo-subtabs" style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" id="htab-kulanz" class="htab active" onclick="setHistoType('Kulanz')"
+        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer">🔧 Kulanz</button>
+      <button type="button" id="htab-ccr" class="htab" onclick="setHistoType('CCR')"
+        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-weight:700;cursor:pointer">📋 CCR</button>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-n gold" id="s-total">0</div><div class="stat-l">Total</div></div>
