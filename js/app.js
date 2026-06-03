@@ -109,7 +109,8 @@ var G = {
   kulanzData: {}, // copie kulanz pour CCR
   fbListening: false,
   demandeType: 'K', // K = Kulanz, C = CCR
-  editingId: null   // id de la demande rouverte pour modification (null = nouvelle demande)
+  editingId: null,  // id de la demande rouverte pour modification (null = nouvelle demande)
+  histoType: 'Kulanz' // onglet actif de l'historique : 'Kulanz' | 'CCR'
 };
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1507,15 +1508,32 @@ function genererPDF() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // HISTORIQUE
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function setHistoType(type) {
+  G.histoType = type;
+  var k = ge('htab-kulanz'), c = ge('htab-ccr');
+  if (k) { var aK = (type==='Kulanz');
+    k.style.background = aK ? 'var(--accent)' : 'var(--card)';
+    k.style.color      = aK ? '#fff' : 'var(--ink)';
+    k.classList.toggle('active', aK);
+  }
+  if (c) { var aC = (type==='CCR');
+    c.style.background = aC ? 'var(--accent)' : 'var(--card)';
+    c.style.color      = aC ? '#fff' : 'var(--ink)';
+    c.classList.toggle('active', aC);
+  }
+  renderHisto();
+}
+
 function renderHisto() {
   // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
   var fS  = G.role==='usager' ? G.site : ge('f-site').value;
-  var fT  = ge('f-type-sel')  ? ge('f-type-sel').value  : '';
+  var fT  = G.histoType || 'Kulanz';   // onglet actif Kulanz / CCR
   var fSt = ge('f-stat-sel')  ? ge('f-stat-sel').value  : '';
 
-  var scope = fS
-    ? G.demandes.filter(function(d) { return d.site===fS; })
-    : G.demandes;
+  // Stats calculées sur le type actif (+ site)
+  var scope = G.demandes.filter(function(d) {
+    return d.type===fT && (!fS || d.site===fS);
+  });
 
   var el = function(id,val) { var e=ge(id); if(e) e.textContent=val; };
   el('s-total', scope.length);
@@ -1524,7 +1542,7 @@ function renderHisto() {
   el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
   var filtered = G.demandes.filter(function(d) {
-    return (!fS||d.site===fS) && (!fT||d.type===fT) && (!fSt||d.statut===fSt);
+    return d.type===fT && (!fS||d.site===fS) && (!fSt||d.statut===fSt);
   });
 
   var _bv=ge('btn-vider-histo'); if(_bv) _bv.style.display=(G.role==='team'?'':'none');
