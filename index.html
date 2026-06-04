@@ -543,6 +543,15 @@
           </span>
         </label>
       </div>
+      <div id="form-progress-wrap" style="margin:6px 0 12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+          <span id="form-progress-label">Champs requis : 0 / 0</span>
+          <span id="form-progress-pct">0 %</span>
+        </div>
+        <div style="height:7px;background:var(--line,#e5e1d8);border-radius:5px;overflow:hidden">
+          <div id="form-progress-bar" style="height:100%;width:0%;background:var(--accent);transition:width .25s,background .25s"></div>
+        </div>
+      </div>
       <p class="submit-note">En soumettant, le formulaire sera envoyé à <strong>teamgarantie@geauto.fr</strong></p>
       <div class="btn-row">
         <button type="button" class="btn-primary" id="btn-envoyer" onclick="envoyerFormulaire()">
@@ -565,17 +574,20 @@
     <div class="histo-head">
       <div class="histo-title">Historique des demandes</div>
       <div class="histo-filters">
+        <input type="text" id="f-search" oninput="renderHisto()" placeholder="🔍 Châssis, OR, conseiller…"
+          style="padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;min-width:200px">
         <select id="f-stat-sel" onchange="renderHisto()">
           <option value="">Tous statuts</option><option>En attente</option><option>Traitée</option><option>Traitée sans participation</option><option>Complément requis</option>
         </select>
+        <button class="btn-vider" id="btn-export-csv" onclick="exportHistoCSV()" style="display:none;background:var(--accent);color:#fff">⬇ CSV</button>
         <button class="btn-vider" id="btn-vider-histo" onclick="viderHistorique()" style="display:none">🗑 Vider</button>
       </div>
     </div>
     <div class="histo-subtabs" style="display:flex;gap:8px;margin-bottom:14px">
       <button type="button" id="htab-kulanz" class="htab active" onclick="setHistoType('Kulanz')"
-        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer">🔧 Kulanz</button>
+        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer">🔧 Kulanz <span id="htab-kulanz-cnt"></span></button>
       <button type="button" id="htab-ccr" class="htab" onclick="setHistoType('CCR')"
-        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-weight:700;cursor:pointer">📋 CCR</button>
+        style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-weight:700;cursor:pointer">📋 CCR <span id="htab-ccr-cnt"></span></button>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-n gold" id="s-total">0</div><div class="stat-l">Total</div></div>
@@ -587,8 +599,14 @@
       <div class="tbl-scroll">
         <table>
           <thead><tr>
-            <th>Date</th><th>Site</th><th>Type</th><th>N° OR</th><th>Châssis</th>
-            <th>Code dom.</th><th>Statut</th><th>Prise en charge</th><th>Commentaire</th><th>Action</th>
+            <th onclick="sortHisto('date')" style="cursor:pointer" title="Trier">Date <span id="sort-date"></span></th>
+            <th onclick="sortHisto('site')" style="cursor:pointer" title="Trier">Site <span id="sort-site"></span></th>
+            <th>Type</th>
+            <th onclick="sortHisto('or')" style="cursor:pointer" title="Trier">N° OR <span id="sort-or"></span></th>
+            <th>Châssis</th>
+            <th>Code dom.</th>
+            <th onclick="sortHisto('statut')" style="cursor:pointer" title="Trier">Statut <span id="sort-statut"></span></th>
+            <th>Prise en charge</th><th>Commentaire</th><th>Action</th>
           </tr></thead>
           <tbody id="histo-body"></tbody>
         </table>
