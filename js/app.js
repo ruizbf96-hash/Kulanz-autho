@@ -110,7 +110,8 @@ var G = {
   fbListening: false,
   demandeType: 'K', // K = Kulanz, C = CCR
   editingId: null,  // id de la demande rouverte pour modification (null = nouvelle demande)
-  histoType: 'Kulanz' // onglet actif de l'historique : 'Kulanz' | 'CCR'
+  histoType: 'Kulanz', // onglet actif de l'historique : 'Kulanz' | 'CCR'
+  histoSort: { key: 'date', dir: 'desc' } // tri actif de l'historique
 };
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -461,6 +462,7 @@ function setType(t) {
   [].forEach.call(document.querySelectorAll('.c-section'), function(el) { el.style.display = !isK ? 'block' : 'none'; });
   ge('comm-num').textContent = isK ? '4' : '6';
   ge('btn-copy-kulanz').style.display = isK ? 'flex' : 'none';
+  if (typeof updateFormProgress === 'function') updateFormProgress();
 }
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -992,6 +994,7 @@ function formSnapshot() {
 }
 
 function saveDraft() {
+  if (typeof updateFormProgress === 'function') updateFormProgress();
   clearTimeout(draftTimer);
   draftTimer = setTimeout(function() {
     var b = formSnapshot();
@@ -1120,7 +1123,7 @@ function fillFormFromRecord(b) {
 document.addEventListener('input',  function(e) {
   if (!e.target.closest('#mainForm')) return;
   saveDraft();
-  // Si l'usager modifie manuellement la désignation pièce, désactiver l'auto-fill
+  updateFormProgress();
 });
 document.addEventListener('change', function(e) {
   if (!e.target.closest('#mainForm')) return;
@@ -1130,6 +1133,7 @@ document.addEventListener('change', function(e) {
   // Déclencher checkKulanzNok sur tout radio dans la section KULANZ
   var kzone = ge('kulanz-questions');
   if (kzone && kzone.contains(e.target)) checkKulanzNok();
+  updateFormProgress();
 });
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1508,6 +1512,76 @@ function genererPDF() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // HISTORIQUE
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// Tri de l'historique au clic sur un en-tête (bascule asc/desc)
+function sortHisto(key) {
+  if (G.histoSort.key === key) {
+    G.histoSort.dir = (G.histoSort.dir === 'asc') ? 'desc' : 'asc';
+  } else {
+    G.histoSort.key = key;
+    G.histoSort.dir = (key === 'date') ? 'desc' : 'asc';
+  }
+  renderHisto();
+}
+
+// Export CSV de la liste actuellement affichée (type + filtres + recherche)
+function exportHistoCSV() {
+  var fS  = G.role==='usager' ? G.site : (ge('f-site')?ge('f-site').value:'');
+  var fT  = G.histoType || 'Kulanz';
+  var fSt = ge('f-stat-sel') ? ge('f-stat-sel').value : '';
+  var q   = (ge('f-search') ? ge('f-search').value : '').toLowerCase().trim();
+  var rows = G.demandes.filter(function(d) {
+    if (d.type!==fT) return false;
+    if (fS && d.site!==fS) return false;
+    if (fSt && d.statut!==fSt) return false;
+    if (q) { var hay=((d.chassis||'')+' '+(d.or||'')+' '+(d.conseiller_client||'')+' '+(d.code_dommage||'')).toLowerCase(); if(hay.indexOf(q)===-1) return false; }
+    return true;
+  });
+  if (!rows.length) { toast('Aucune demande à exporter.'); return; }
+  var cols = ['date','site','type','or','chassis','kvps','code_dommage','conseiller_client','email_usager','kilometrage','statut','commentaire_team'];
+  var head = ['Date','Site','Type','N OR','Chassis','KVPS','Code dommage','Conseiller','Email','Kilometrage','Statut','Commentaire'];
+  var esc2 = function(v){ v = String(v==null?'':v).replace(/"/g,'""'); return '"'+v+'"'; };
+  var csv = head.map(esc2).join(';') + '\r\n';
+  rows.forEach(function(d){ csv += cols.map(function(c){ return esc2(d[c]); }).join(';') + '\r\n'; });
+  var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'}); // BOM pour Excel
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'historique_'+fT+'_'+(fS||'tous')+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  toast('✔ Export CSV ('+rows.length+' demande(s)).');
+}
+
+// Indicateur de progression : compte les champs requis remplis (adapté Kulanz/CCR)
+function updateFormProgress() {
+  var bar = ge('form-progress-bar'); if (!bar) return;
+  var isCCR = (ge('f-type') && ge('f-type').value === 'CCR');
+  // Champs requis communs
+  var checks = [
+    !!(ge('f-site') && ge('f-site').value),
+    isValidVIN(gv('chassis')),
+    /^\d{6}$/.test(gv('or_number')),
+    !!gv('plainte_client'),
+    !!(ge('desig-val') && ge('desig-val').value),
+    !!(ge('dom-val') && ge('dom-val').value),
+    !!(ge('ava-val') && ge('ava-val').value),
+    !!gv('conseiller_client'),
+    /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('email_usager'))
+  ];
+  if (isCCR) {
+    checks.push(!!gr('elsa_dispo'));
+    checks.push(/^\d{9}$/.test(gv('iq_num')));
+    checks.push(!!(ge('chk-engagement') && ge('chk-engagement').checked));
+  }
+  var done = checks.filter(Boolean).length;
+  var total = checks.length;
+  var pct = total ? Math.round(done/total*100) : 0;
+  bar.style.width = pct + '%';
+  bar.style.background = (pct===100) ? 'var(--green,#0B7A6E)' : 'var(--accent)';
+  var lbl = ge('form-progress-label'); if (lbl) lbl.textContent = 'Champs requis : ' + done + ' / ' + total;
+  var pc  = ge('form-progress-pct');   if (pc)  pc.textContent = pct + ' %';
+}
+
 function setHistoType(type) {
   G.histoType = type;
   var k = ge('htab-kulanz'), c = ge('htab-ccr');
@@ -1541,11 +1615,43 @@ function renderHisto() {
   el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
   el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
+  // Compteurs sur les onglets (demandes en attente par type, sur le site filtré)
+  var siteScope = G.demandes.filter(function(d){ return !fS || d.site===fS; });
+  var waitK = siteScope.filter(function(d){ return d.type==='Kulanz' && d.statut==='En attente'; }).length;
+  var waitC = siteScope.filter(function(d){ return d.type==='CCR' && d.statut==='En attente'; }).length;
+  var ck1 = ge('htab-kulanz-cnt'); if (ck1) ck1.textContent = waitK ? '('+waitK+')' : '';
+  var cc1 = ge('htab-ccr-cnt');    if (cc1) cc1.textContent = waitC ? '('+waitC+')' : '';
+
+  // Recherche texte (châssis, OR, conseiller, code dommage)
+  var q = (ge('f-search') ? ge('f-search').value : '').toLowerCase().trim();
+
   var filtered = G.demandes.filter(function(d) {
-    return d.type===fT && (!fS||d.site===fS) && (!fSt||d.statut===fSt);
+    if (d.type!==fT) return false;
+    if (fS && d.site!==fS) return false;
+    if (fSt && d.statut!==fSt) return false;
+    if (q) {
+      var hay = ((d.chassis||'')+' '+(d.or||'')+' '+(d.conseiller_client||'')+' '+(d.code_dommage||'')).toLowerCase();
+      if (hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+
+  // Tri
+  var sk = G.histoSort.key, sdir = (G.histoSort.dir==='asc'?1:-1);
+  filtered.sort(function(a,b){
+    var va, vb;
+    if (sk==='or')      { va=parseInt(a.or)||0; vb=parseInt(b.or)||0; }
+    else if (sk==='date'){ va=String(a.id); vb=String(b.id); } // id = timestamp, tri fiable
+    else                { va=String(a[sk]||'').toLowerCase(); vb=String(b[sk]||'').toLowerCase(); }
+    if (va<vb) return -1*sdir; if (va>vb) return 1*sdir; return 0;
+  });
+  // Indicateurs de tri dans les en-têtes
+  ['date','site','or','statut'].forEach(function(k){
+    var s=ge('sort-'+k); if(s) s.textContent = (sk===k) ? (G.histoSort.dir==='asc'?'▲':'▼') : '';
   });
 
   var _bv=ge('btn-vider-histo'); if(_bv) _bv.style.display=(G.role==='team'?'':'none');
+  var _ex=ge('btn-export-csv');  if(_ex) _ex.style.display=(G.role==='team'?'':'none');
   var tbody = ge('histo-body');
   var empty = ge('histo-empty');
   if (!tbody) return;
