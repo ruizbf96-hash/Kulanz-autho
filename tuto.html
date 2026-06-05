@@ -133,6 +133,7 @@ footer strong{color:var(--accent-d)}
       <li><a href="#ccr">Faire une demande CCR</a></li>
       <li><a href="#envoi">Envoyer la demande</a></li>
       <li><a href="#mailauto">Ouvrir le mail automatiquement</a></li>
+      <li><a href="#suivi">Suivre &amp; traiter les demandes</a></li>
       <li><a href="#statuts">Les statuts</a></li>
       <li><a href="#faq">Questions fréquentes</a></li>
     </ol>
@@ -208,13 +209,14 @@ footer strong{color:var(--accent-d)}
       <div class="warn">Une demande <strong>KULANZ doit avoir été effectuée avant</strong> toute demande CCR.</div>
       <h3>Gagner du temps</h3>
       <p>Si vous venez de remplir une KULANZ, cliquez sur <span class="demo teal">Copier les données depuis Kulanz</span> : châssis, OR, plainte, codes… sont repris automatiquement dans la CCR.</p>
-      <h3>À compléter</h3>
+      <h3>Pièces à fournir (section 4)</h3>
       <ul class="bul">
-        <li><strong>Prérequis</strong> : confirmez que la KULANZ a été faite.</li>
-        <li><strong>Pièces à fournir</strong> : cochez les justificatifs (devis au taux garantie, ELSA, factures d'entretien, IQ, etc.).</li>
-        <li><strong>Règle CIG</strong> : CIG 70/30 de 16 % obligatoire (ou taux supérieur à préciser).</li>
-        <li><strong>Case d'engagement</strong> : à cocher obligatoirement avant l'envoi.</li>
+        <li><strong>Devis</strong> – sans forfait, sans diagnostic.</li>
+        <li><strong>Plan d'entretien numérique ELSA disponible ? (Oui / Non)</strong> — obligatoire. Si vous répondez <strong>Non</strong>, un bloc apparaît pour cocher les <strong>factures d'entretien</strong> (réseau / hors réseau).</li>
+        <li><strong>IQ n°</strong> — obligatoire, exactement <strong>9 chiffres</strong>.</li>
+        <li><strong>Feuille Commentaire Technicien</strong> avec diagnostic.</li>
       </ul>
+      <div class="warn">L'envoi est bloqué tant que la réponse <strong>ELSA</strong> n'est pas donnée et que le <strong>n° IQ</strong> ne fait pas 9 chiffres. La case d'<strong>engagement</strong> reste à cocher avant l'envoi.</div>
     </div>
   </section>
 
@@ -225,7 +227,7 @@ footer strong{color:var(--accent-d)}
       <p>Quand le formulaire est complet, cliquez sur <span class="demo teal">Envoyer la demande</span>. L'application vérifie les champs obligatoires puis enregistre la demande. Un écran de confirmation s'affiche : vous savez ainsi que la demande est bien partie.</p>
 
       <h3>Pour une demande CCR : joindre les documents</h3>
-      <p>Après l'envoi d'une <strong>CCR</strong>, un e-mail pré-rempli vers <strong>teamgarantie@geauto.fr</strong> s'ouvre dans votre messagerie. Avant de cliquer sur « Envoyer » dans votre messagerie, <strong>joignez les documents justificatifs</strong> de votre dossier, par exemple :</p>
+      <p>Après l'envoi d'une <strong>CCR</strong>, un e-mail pré-rempli s'ouvre dans votre messagerie : il est adressé à <strong>l'usager qui a créé la demande</strong>, avec la <strong>TeamGarantie en copie (CC)</strong>. Avant de cliquer sur « Envoyer » dans votre messagerie, <strong>joignez les documents justificatifs</strong> de votre dossier, par exemple :</p>
       <ul class="bul">
         <li>l'<strong>Ordre de Réparation (OR)</strong> ;</li>
         <li>le <strong>devis</strong> au taux garantie ;</li>
@@ -238,7 +240,7 @@ footer strong{color:var(--accent-d)}
       <h3>Le bouton « Enregistrer en PDF »</h3>
       <p>Le bouton <span class="demo ghost">Enregistrer en PDF</span> crée un simple <strong>récapitulatif</strong> de ce que vous avez saisi, pratique pour archiver ou relire. Il ne contient aucun justificatif et n'est pas obligatoire.</p>
 
-      <div class="note">Le sujet de l'e-mail CCR est rempli automatiquement (Demande CCR – KVPS – Site – Châssis – Demandeur), ce qui aide la TeamGarantie à traiter votre dossier.</div>
+      <div class="note">Le sujet de l'e-mail CCR est rempli automatiquement (Demande CCR – KVPS – Site – Châssis – Demandeur), ce qui aide la TeamGarantie à traiter votre dossier. La <strong>TeamGarantie est systématiquement mise en copie (CC)</strong> des e-mails préparés par l'application.</div>
       <div class="warn">Si un champ obligatoire manque (châssis, OR, plainte, désignation, code dommage, code avarie, nom, e-mail), un message vous l'indique et l'envoi est bloqué tant qu'il n'est pas corrigé.</div>
     </div>
   </section>
@@ -271,9 +273,36 @@ footer strong{color:var(--accent-d)}
     </div>
   </section>
 
-  <!-- 7. Statuts -->
+  <!-- 7. Suivi -->
+  <section id="suivi">
+    <div class="s-head"><div class="s-num">7</div><h2>Suivre &amp; traiter les demandes</h2></div>
+    <div class="s-body">
+      <p>Une fois connecté, trois onglets sont disponibles en haut : <span class="demo ghost">📝 Formulaire</span>, <span class="demo ghost">📥 Demandes</span> et <span class="demo ghost">📋 Historique</span>.</p>
+
+      <h3>📥 Demandes (à traiter)</h3>
+      <p>Cet onglet liste les demandes <strong>En attente</strong> et <strong>Complément requis</strong>. Le nombre en attente s'affiche directement sur l'onglet (ex. « 📥 Demandes (3) »).</p>
+      <ul class="bul">
+        <li>Pour la <strong>TeamGarantie</strong> : un clic sur une ligne ouvre directement la fenêtre de <strong>validation</strong> (statut, commentaire, prise en charge).</li>
+        <li>Pour un <strong>usager</strong> : un clic rouvre la demande pour la consulter ou la corriger.</li>
+      </ul>
+
+      <h3>📋 Historique (traité)</h3>
+      <p>Cet onglet n'affiche que les demandes déjà <strong>traitées</strong>. Cliquer sur une demande la rouvre : si elle est <strong>traitée</strong>, elle s'ouvre pré-remplie pour créer rapidement une nouvelle demande similaire (même client, même réclamation).</p>
+
+      <h3>Outils communs aux deux onglets</h3>
+      <ul class="bul">
+        <li><strong>Onglets 🔧 Kulanz / 📋 CCR</strong> : séparent les deux types, chacun avec ses statistiques.</li>
+        <li><strong>Recherche</strong> : par châssis, n° OR, conseiller ou code dommage.</li>
+        <li><strong>Tri</strong> : cliquez sur les en-têtes Date, Site, N° OR ou Statut.</li>
+        <li><strong>Export CSV</strong> (TeamGarantie) : exporte la liste filtrée, ouvrable dans Excel.</li>
+      </ul>
+      <div class="tip">La barre de progression en bas du formulaire indique en temps réel combien de champs obligatoires sont remplis (et passe au vert à 100 %).</div>
+    </div>
+  </section>
+
+  <!-- 8. Statuts -->
   <section id="statuts">
-    <div class="s-head"><div class="s-num">7</div><h2>Les statuts</h2></div>
+    <div class="s-head"><div class="s-num">8</div><h2>Les statuts</h2></div>
     <div class="s-body">
       <div class="badges">
         <span class="badge b-wait">🟡 En attente</span>
@@ -291,9 +320,9 @@ footer strong{color:var(--accent-d)}
     </div>
   </section>
 
-  <!-- 8. FAQ -->
+  <!-- 9. FAQ -->
   <section id="faq">
-    <div class="s-head"><div class="s-num">8</div><h2>Questions fréquentes</h2></div>
+    <div class="s-head"><div class="s-num">9</div><h2>Questions fréquentes</h2></div>
     <div class="s-body">
       <dl class="faq">
         <dt>J'ai oublié mon mot de passe, comment le réinitialiser ?</dt>
