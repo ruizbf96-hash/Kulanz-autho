@@ -1242,39 +1242,42 @@ function envoyerFormulaire() {
     btn.disabled = true; btn.textContent = 'Pr\u00e9paration\u2026';
     try { genererPDF(); } catch(e) { console.warn('PDF:', e); }
     // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
+    var _elsa = gr('elsa_dispo') || '-';
+    var _fact = '';
+    if (_elsa === 'NON') {
+      var _pcs = []; [].forEach.call(document.querySelectorAll('[name="pieces[]"]:checked'), function(el){ _pcs.push(el.value); });
+      _fact = _pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune';
+    }
+    var _devis = document.querySelector('[name="pieces[]"][value="Devis"]:checked') ? 'oui' : 'non';
+    var _fct   = document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked') ? 'oui' : 'non';
+
     var corps = 'DEMANDE CCR - ' + site + '\n';
+    corps += 'A: ' + (gv('email_usager')||'-') + '  |  CC: teamgarantie@geauto.fr\n';
     corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
-    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
-    corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
-    corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
-    corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
+    corps += 'Conseiller client: ' + gv('conseiller_client') + '\n';
+    corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '  |  Km: ' + (gv('kilometrage')||'') + '\n\n';
     corps += 'NATURE DOMMAGE:\n';
     corps += 'Categorie: ' + (ge('dom-cat')?ge('dom-cat').value:'') + '\n';
     corps += 'Rubrique: ' + (ge('rub-val')?ge('rub-val').value:'') + '\n';
-    corps += 'Designation: ' + (ge('desig-val')?ge('desig-val').value:'') + '\n';
+    corps += 'Designation piece: ' + (ge('desig-val')?ge('desig-val').value:'') + '\n';
     corps += 'Code dommage: ' + (ge('dom-val')?ge('dom-val').value:'') + '\n';
     corps += 'Code avarie: ' + (ge('ava-val')?ge('ava-val').value:'') + '\n';
     corps += 'Emplacement: ' + (gv('emplacement')||'') + '\n\n';
     corps += 'PIECES A FOURNIR:\n';
-    corps += 'Plan ELSA disponible: ' + (gr('elsa_dispo')||'-') + '\n';
-    if (gr('elsa_dispo') === 'NON') {
-      var _pcs = []; [].forEach.call(document.querySelectorAll('[name="pieces[]"]:checked'), function(el){ _pcs.push(el.value); });
-      corps += 'Factures fournies: ' + (_pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune') + '\n';
-    }
+    corps += 'Plan ELSA disponible: ' + _elsa + '\n';
+    if (_elsa === 'NON') corps += 'Factures fournies: ' + _fact + '\n';
     corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
-    corps += 'Devis: ' + (document.querySelector('[name="pieces[]"][value="Devis"]:checked')?'oui':'non') + '\n';
-    corps += 'Feuille Commentaire Technicien: ' + (document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked')?'oui':'non') + '\n\n';
-    corps += '--- ETAPES ---\n';
-    corps += '1. Joindre le PDF Demande CCR\n';
-    corps += '2. Joindre les documents justificatifs\n';
-    corps += '3. Envoyer depuis Outlook\n';
-    corps += '\nTeam Garantie GEA - VW';
+    corps += 'Devis: ' + _devis + '\n';
+    corps += 'Feuille Commentaire Technicien: ' + _fct + '\n\n';
+    corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
+    corps += 'A joindre: PDF Demande CCR + justificatifs, puis envoyer depuis Outlook.\n';
+    corps += 'Team Garantie GEA - VW';
     var kvps2   = gv('kvps') || site;
     var subject = 'Demande CCR - ' + kvps2 + ' - ' + site + ' - ' + gv('chassis') + ' - ' + gv('conseiller_client');
     window._lastSubject = subject; // Stocké pour copierObjetMail()
-    // Limiter a 1000 chars pour garantir compatibilite tous clients mail
-    var corpsLimite = corps.length > 1000
-      ? corps.substring(0, 1000) + '\n[Voir PDF pour details complets]'
+    // Limiter pour compatibilite clients mail, mais assez large pour contenir codes + plainte
+    var corpsLimite = corps.length > 1800
+      ? corps.substring(0, 1800) + '\n[Voir PDF pour details complets]'
       : corps;
     // Destinataire = usager qui a généré la demande ; teamgarantie en copie (CC)
     var _destCCR = (gv('email_usager') || '').trim() || 'teamgarantie@geauto.fr';
@@ -2087,8 +2090,9 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var corps=sep+'\n';
   corps+='🔧  DEMANDE KULANZ — '+(d.site||'').toUpperCase()+'\n';
   corps+=sep+'\n\n';
+  corps+='A: '+(d.email_usager||d.email||'—')+'  |  CC: teamgarantie@geauto.fr\n\n';
   corps+='📋  IDENTIFICATION\n'+sep2+'\n';
-  corps+='  N° OR          : '+(d.or_number||'—')+'\n';
+  corps+='  N° OR          : '+(d.or||d.or_number||'—')+'\n';
   corps+='  Date OR        : '+(d.date_or||'—')+'\n';
   corps+='  Châssis        : '+(d.chassis||'—')+'\n';
   corps+='  Kilométrage    : '+(d.kilometrage||'—')+' km\n';
@@ -2096,11 +2100,11 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   corps+='  Conseiller     : '+(d.conseiller_client||'—')+'\n';
   corps+='  E-mail         : '+(d.email_usager||'—')+'\n\n';
   corps+='🔩  DOMMAGE\n'+sep2+'\n';
-  corps+='  Catégorie      : '+(d.categorie||'—')+'\n';
-  corps+='  Rubrique       : '+(d.rubrique||'—')+'\n';
-  corps+='  Désignation    : '+(d.designation||'—')+'\n';
-  corps+='  Code dommage   : '+(d.code_dom||'—')+'\n';
-  corps+='  Code avarie    : '+(d.code_ava||'—')+'\n';
+  corps+='  Catégorie      : '+(d.categorie||d.dom_cat||'—')+'\n';
+  corps+='  Rubrique       : '+(d.rubrique||d.dom_rub||'—')+'\n';
+  corps+='  Désignation    : '+(d.desig_piece||'—')+'\n';
+  corps+='  Code dommage   : '+(d.code_dommage||d.dom_code||'—')+'\n';
+  corps+='  Code avarie    : '+((d.ava_code?d.ava_code+(d.ava_lbl?' — '+d.ava_lbl:''):'')||'—')+'\n';
   if(d.plainte_client) corps+='  Plainte client : '+d.plainte_client+'\n';
   corps+='\n'+statIcon+'  STATUT : '+statut.toUpperCase()+'\n'+sep2+'\n';
   if(commentaire) corps+='  Commentaire    : '+commentaire+'\n';
@@ -2118,7 +2122,7 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   // Ouvrir Outlook avec l'email pré-rempli
   var dest = d.email_usager || d.email || '';
   if (!dest) dest = 'teamgarantie@geauto.fr';
-  var corpsEnc = encodeURIComponent(corps.substring(0, 1500));
+  var corpsEnc = encodeURIComponent(corps.substring(0, 1800));
   var sujetEnc = encodeURIComponent(sujet);
   // teamgarantie@geauto.fr en copie (sauf s'il est déjà le destinataire)
   var ccPart = (dest.toLowerCase() !== 'teamgarantie@geauto.fr') ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
