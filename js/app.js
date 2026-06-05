@@ -1276,8 +1276,13 @@ function envoyerFormulaire() {
     var corpsLimite = corps.length > 1000
       ? corps.substring(0, 1000) + '\n[Voir PDF pour details complets]'
       : corps;
-    var mailto  = 'mailto:teamgarantie@geauto.fr'
+    // Destinataire = usager qui a généré la demande ; teamgarantie en copie (CC)
+    var _destCCR = (gv('email_usager') || '').trim() || 'teamgarantie@geauto.fr';
+    var _ccCCR   = (_destCCR.toLowerCase() !== 'teamgarantie@geauto.fr')
+                 ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
+    var mailto  = 'mailto:' + _destCCR
                 + '?subject=' + encodeURIComponent(subject)
+                + _ccCCR
                 + '&body='    + encodeURIComponent(corpsLimite);
     // Ouvrir Outlook — méthode universelle Chrome/Firefox/Edge
     // createElement + click = jamais bloqué car c'est un geste utilisateur direct
@@ -2115,7 +2120,9 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   if (!dest) dest = 'teamgarantie@geauto.fr';
   var corpsEnc = encodeURIComponent(corps.substring(0, 1500));
   var sujetEnc = encodeURIComponent(sujet);
-  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
+  // teamgarantie@geauto.fr en copie (sauf s'il est déjà le destinataire)
+  var ccPart = (dest.toLowerCase() !== 'teamgarantie@geauto.fr') ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
+  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + ccPart + '&body=' + corpsEnc;
 
   window.location.href = mailto;
   toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
