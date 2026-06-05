@@ -222,6 +222,7 @@
   <!-- Onglets -->
   <div class="nav-tabs">
     <button class="nav-tab active" id="tab-form" onclick="showPage('form',this)">📝 Formulaire</button>
+    <button class="nav-tab" id="tab-demandes" onclick="showPage('demandes',this)" style="display:none">📥 Demandes <span id="tab-demandes-cnt"></span></button>
     <button class="nav-tab" id="tab-histo" onclick="showPage('histo',this)" style="display:none">📋 Historique</button>
   </div>
 
@@ -572,7 +573,7 @@
 <div id="page-histo" class="page">
   <div class="histo-wrap">
     <div class="histo-head">
-      <div class="histo-title">Historique des demandes</div>
+      <div class="histo-title" id="histo-title">Historique des demandes</div>
       <div class="histo-filters">
         <input type="text" id="f-search" oninput="renderHisto()" placeholder="🔍 Châssis, OR, conseiller…"
           style="padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;min-width:200px">
