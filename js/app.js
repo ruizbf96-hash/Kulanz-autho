@@ -111,7 +111,8 @@ var G = {
   demandeType: 'K', // K = Kulanz, C = CCR
   editingId: null,  // id de la demande rouverte pour modification (null = nouvelle demande)
   histoType: 'Kulanz', // onglet actif de l'historique : 'Kulanz' | 'CCR'
-  histoSort: { key: 'date', dir: 'desc' } // tri actif de l'historique
+  histoSort: { key: 'date', dir: 'desc' }, // tri actif de l'historique
+  histoMode: 'pending' // 'pending' = file à traiter | 'treated' = archive
 };
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -298,6 +299,7 @@ function ouvrirApp() {
   var mh = ge('main-header') || document.querySelector('header');
   if (mh) mh.style.display = '';
   ge('h-user').style.display = 'flex';
+  if (ge('tab-demandes')) ge('tab-demandes').style.display = 'block';
   ge('tab-histo').style.display = 'block';
 
   if (G.role === 'team') {
@@ -394,6 +396,7 @@ function deconnecter() {
   ge('lp-step2').style.display = 'none';
   if (ge('lp-step3')) ge('lp-step3').style.display = 'none';
   ge('h-user').style.display = 'none';
+  if (ge('tab-demandes')) ge('tab-demandes').style.display = 'none';
   ge('tab-histo').style.display = 'none';
   ge('dash-wrap').classList.remove('on');
   ge('h-alert').classList.remove('on');
@@ -414,10 +417,14 @@ function deconnecter() {
 function showPage(page, tabEl) {
   [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
   [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
-  ge('page-'+page).classList.add('active');
+  // 'demandes' et 'histo' partagent la même page (page-histo) avec un mode différent
+  var realPage = (page === 'demandes') ? 'histo' : page;
+  if (page === 'demandes') G.histoMode = 'pending';
+  else if (page === 'histo') G.histoMode = 'treated';
+  ge('page-'+realPage).classList.add('active');
   if (tabEl) tabEl.classList.add('active');
   ge('type-bar').style.display = (page === 'form') ? 'flex' : 'none';
-  if (page === 'histo') renderHisto();
+  if (realPage === 'histo') renderHisto();
 }
 
 function selectSite(btn, name) {
@@ -1603,10 +1610,18 @@ function renderHisto() {
   var fS  = G.role==='usager' ? G.site : ge('f-site').value;
   var fT  = G.histoType || 'Kulanz';   // onglet actif Kulanz / CCR
   var fSt = ge('f-stat-sel')  ? ge('f-stat-sel').value  : '';
+  var mode = G.histoMode || 'pending';
+  // Un dossier est "à traiter" si En attente ou Complément requis ; sinon "traité"
+  var isPending = function(d){ return d.statut==='En attente' || d.statut==='Complément requis'; };
+  var inMode = function(d){ return mode==='pending' ? isPending(d) : !isPending(d); };
 
-  // Stats calculées sur le type actif (+ site)
+  // Titre + colonne d'action selon le mode
+  var titleEl = ge('histo-title');
+  if (titleEl) titleEl.textContent = (mode==='pending') ? 'Demandes à traiter' : 'Historique (demandes traitées)';
+
+  // Stats calculées sur le type actif (+ site, + mode)
   var scope = G.demandes.filter(function(d) {
-    return d.type===fT && (!fS || d.site===fS);
+    return d.type===fT && (!fS || d.site===fS) && inMode(d);
   });
 
   var el = function(id,val) { var e=ge(id); if(e) e.textContent=val; };
@@ -1615,18 +1630,23 @@ function renderHisto() {
   el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
   el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
-  // Compteurs sur les onglets (demandes en attente par type, sur le site filtré)
-  var siteScope = G.demandes.filter(function(d){ return !fS || d.site===fS; });
-  var waitK = siteScope.filter(function(d){ return d.type==='Kulanz' && d.statut==='En attente'; }).length;
-  var waitC = siteScope.filter(function(d){ return d.type==='CCR' && d.statut==='En attente'; }).length;
-  var ck1 = ge('htab-kulanz-cnt'); if (ck1) ck1.textContent = waitK ? '('+waitK+')' : '';
-  var cc1 = ge('htab-ccr-cnt');    if (cc1) cc1.textContent = waitC ? '('+waitC+')' : '';
+  // Compteurs sur les onglets Kulanz/CCR (selon le mode courant)
+  var siteScope = G.demandes.filter(function(d){ return (!fS || d.site===fS) && inMode(d); });
+  var cntK = siteScope.filter(function(d){ return d.type==='Kulanz'; }).length;
+  var cntC = siteScope.filter(function(d){ return d.type==='CCR'; }).length;
+  var ck1 = ge('htab-kulanz-cnt'); if (ck1) ck1.textContent = cntK ? '('+cntK+')' : '';
+  var cc1 = ge('htab-ccr-cnt');    if (cc1) cc1.textContent = cntC ? '('+cntC+')' : '';
+
+  // Badge sur l'onglet "Demandes" : total en attente (tous types, site filtré)
+  var pendingTotal = G.demandes.filter(function(d){ return (!fS||d.site===fS) && isPending(d); }).length;
+  var tdc = ge('tab-demandes-cnt'); if (tdc) tdc.textContent = pendingTotal ? '('+pendingTotal+')' : '';
 
   // Recherche texte (châssis, OR, conseiller, code dommage)
   var q = (ge('f-search') ? ge('f-search').value : '').toLowerCase().trim();
 
   var filtered = G.demandes.filter(function(d) {
     if (d.type!==fT) return false;
+    if (!inMode(d)) return false;
     if (fS && d.site!==fS) return false;
     if (fSt && d.statut!==fSt) return false;
     if (q) {
@@ -1684,7 +1704,7 @@ function renderHisto() {
     var action = G.role==='team'
       ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" style="'+_btnStyle+'" onclick="event.stopPropagation();openSPFromBtn(this)">'+_btnLabel+'</button>'
       : '<span style="font-size:11px;color:var(--accent-d);font-weight:600">Ouvrir ›</span>';
-    return '<tr style="cursor:pointer" onclick="openDemande(\''+esc(String(d.id))+'\')" title="Cliquer pour rouvrir la demande">'+
+    return '<tr style="cursor:pointer" onclick="histoRowClick(\''+esc(String(d.id))+'\')" title="Cliquer pour ouvrir">'+
       '<td>'+esc(d.date||'')+'</td>'+
       '<td style="font-weight:500">'+esc(d.site||'')+'</td>'+
       '<td><span style="font-size:11px;font-weight:600;color:var(--gold)">'+esc(d.type||'')+'</span></td>'+
@@ -1820,11 +1840,12 @@ function dashClick(el) {
   [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
     b.classList.toggle('active', b.textContent.trim() === newSite);
   });
-  // Basculer sur l'historique
+  // Basculer sur la file "Demandes à traiter" (mode pending)
   [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
   [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
+  G.histoMode = 'pending';
   ge('page-histo').classList.add('active');
-  ge('tab-histo').classList.add('active');
+  if (ge('tab-demandes')) ge('tab-demandes').classList.add('active');
   ge('type-bar').style.display = 'none';
   renderHisto();
   renderDash();
@@ -1836,6 +1857,17 @@ function dashClick(el) {
 function openSPFromBtn(btn) {
   var id = btn.getAttribute('data-id');
   openSP(id);
+}
+
+// Clic sur une ligne d'historique :
+//  - mode "à traiter" + TeamGarantie -> ouvre directement la fenêtre de validation
+//  - sinon -> rouvre la demande (consultation / édition / duplication)
+function histoRowClick(id) {
+  if (G.histoMode === 'pending' && G.role === 'team') {
+    openSP(id);
+  } else {
+    openDemande(id);
+  }
 }
 
 // Retrouve une demande par id (compare en chaîne)
