@@ -1973,8 +1973,42 @@ function openSP(id) {
   setText('sp-type',    d.type);
   setText('sp-or',      d.or);
   setText('sp-chassis', d.chassis);
+  setText('sp-km',      d.kilometrage ? d.kilometrage+' km' : '');
   setText('sp-dom',     d.code_dommage);
+  setText('sp-ava',     (d.ava_code ? d.ava_code + (d.ava_lbl ? ' — '+d.ava_lbl : '') : ''));
   setText('sp-date',    d.date);
+
+  // Vérifications KULANZ (réponses du demandeur) — uniquement pour les demandes Kulanz
+  var ksec = ge('sp-kulanz-sec');
+  var klist = ge('sp-kulanz-list');
+  if (ksec && klist) {
+    if (d.type === 'Kulanz') {
+      var brandK = SITE_BRAND[d.site] || 'VW';
+      var qs = KULANZ_BY_BRAND[brandK] || KULANZ_BY_BRAND['VW'];
+      var rows = '';
+      qs.forEach(function(q) {
+        var val = d['k_'+q.name];
+        if (val === undefined || val === null || val === '') return; // non répondu : on saute
+        // Couleur : rouge si réponse NOK, vert sinon
+        var isNok = (q.nok && val === q.nok);
+        var color = isNok ? 'var(--red,#c0392b)' : 'var(--green,#0B7A6E)';
+        rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid var(--line,#eee)">'
+              + '<span style="color:#555">' + esc(q.label) + '</span>'
+              + '<strong style="color:'+color+';white-space:nowrap">' + esc(val) + '</strong></div>';
+        if (q.name === 'tpi' && val === 'OUI' && d.num_tpi) {
+          rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid var(--line,#eee)">'
+                + '<span style="color:#555">N° TPI</span><strong>' + esc(d.num_tpi) + '</strong></div>';
+        }
+      });
+      if (d.num_tpi && rows.indexOf('N° TPI')===-1) {
+        rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0"><span style="color:#555">N° TPI</span><strong>'+esc(d.num_tpi)+'</strong></div>';
+      }
+      klist.innerHTML = rows || '<span style="color:#999">Aucune réponse enregistrée.</span>';
+      ksec.style.display = 'block';
+    } else {
+      ksec.style.display = 'none';
+    }
+  }
   var stat = ge('sp-statut');
   if (stat) stat.value = d.statut || 'En attente';
   var cmt = ge('sp-comment');
