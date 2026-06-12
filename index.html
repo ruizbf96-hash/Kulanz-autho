@@ -323,10 +323,10 @@
             <span class="hint" id="cat-hint"></span>
           </div>
 
-          <!-- Rubrique -->
-          <div class="field col2">
-            <label>Rubrique <span class="req">*</span></label>
-            <input type="hidden" id="rub-val" name="rubrique_dommage">
+          <!-- Rubrique : champ masqué (déduit automatiquement), conservé pour la cascade -->
+          <input type="hidden" id="rub-val" name="rubrique_dommage">
+          <div class="field col2" id="rub-field" style="display:none">
+            <label>Rubrique</label>
             <div class="ss-wrap" id="ss-rub">
               <button type="button" class="ss-btn" id="ss-rub-btn" onclick="ssToggle('rub')">
                 <span class="ss-txt" id="ss-rub-txt">🔍 Rechercher une rubrique…</span>
