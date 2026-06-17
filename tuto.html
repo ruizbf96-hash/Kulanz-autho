@@ -176,7 +176,7 @@ footer strong{color:var(--accent-d)}
       <ul class="bul">
         <li><strong>Plainte du client</strong> — décrivez le symptôme signalé.</li>
         <li><strong>Catégorie</strong> — choisissez un domaine (Motopropulseur, Transmission, Trains roulants, Carrosserie, Chauffage/Clim, Équip. électrique) ou « Saisie libre ».</li>
-        <li><strong>Rubrique → Désignation → Code dommage → Code avarie</strong> — voir la section suivante.</li>
+        <li><strong>Désignation → Code dommage → Code avarie</strong> — voir la section suivante (la rubrique est déduite automatiquement).</li>
       </ul>
 
       <h3>③ Vérifications KULANZ</h3>
@@ -189,15 +189,15 @@ footer strong{color:var(--accent-d)}
   <section id="codes">
     <div class="s-head"><div class="s-num">3</div><h2>Choisir les codes (cascade)</h2></div>
     <div class="s-body">
-      <p>Les quatre champs fonctionnent en <strong>cascade</strong> : chaque choix affine le suivant.</p>
+      <p>Les champs fonctionnent en <strong>cascade</strong> : chaque choix affine le suivant.</p>
       <ol class="steps">
-        <li><strong>Rubrique</strong> — filtrée selon la catégorie choisie. Cliquez sur le champ, tapez quelques lettres, sélectionnez.</li>
-        <li><strong>Désignation pièce</strong> — la liste se limite aux pièces de la rubrique retenue.</li>
+        <li><strong>Catégorie</strong> — choisissez la famille concernée (Motopropulseur, Transmission, Trains roulants…).</li>
+        <li><strong>Désignation pièce</strong> — cliquez sur le champ, tapez quelques lettres, sélectionnez la pièce.</li>
         <li><strong>Code dommage</strong> — proposé automatiquement à partir de la désignation. S'il n'existe qu'un seul code, il est sélectionné pour vous.</li>
         <li><strong>Code avarie</strong> — décrit le type de défaut (mécanique, corrosion, étanchéité…).</li>
       </ol>
+      <div class="note">La <strong>rubrique</strong> est déterminée automatiquement à partir de la pièce ou du code : vous n'avez plus à la saisir. Elle reste enregistrée dans la demande, l'e-mail et le PDF.</div>
       <div class="tip">Chaque liste possède une recherche (par code ou libellé) et une <strong>saisie manuelle</strong> si le code voulu ne figure pas dans la liste. Le bouton <span class="demo ghost">✕ Effacer</span> réinitialise un champ.</div>
-      <div class="note">Renseigner un code dommage remonte automatiquement la rubrique et la catégorie correspondantes si elles étaient vides — pratique pour aller plus vite.</div>
     </div>
   </section>
 
@@ -225,6 +225,8 @@ footer strong{color:var(--accent-d)}
     <div class="s-head"><div class="s-num">5</div><h2>Envoyer la demande</h2></div>
     <div class="s-body">
       <p>Quand le formulaire est complet, cliquez sur <span class="demo teal">Envoyer la demande</span>. L'application vérifie les champs obligatoires puis enregistre la demande. Un écran de confirmation s'affiche : vous savez ainsi que la demande est bien partie.</p>
+      <div class="tip">Si des champs manquent, un <strong>seul message</strong> récapitule tout ce qu'il reste à corriger, et les champs concernés sont <strong>surlignés en rouge</strong> (la page défile jusqu'au premier). Plus besoin de cliquer plusieurs fois.</div>
+      <div class="note">Votre saisie est sauvegardée automatiquement : l'indication <strong>« ✓ Enregistré »</strong> apparaît près de la barre de progression. Si vous tentez de fermer l'onglet avec une demande non envoyée, le navigateur vous prévient pour éviter toute perte.</div>
 
       <h3>Pour une demande CCR : joindre les documents</h3>
       <p>Après l'envoi d'une <strong>CCR</strong>, un e-mail pré-rempli s'ouvre dans votre messagerie : il est adressé à <strong>l'usager qui a créé la demande</strong>, avec la <strong>TeamGarantie en copie (CC)</strong>. Avant de cliquer sur « Envoyer » dans votre messagerie, <strong>joignez les documents justificatifs</strong> de votre dossier, par exemple :</p>
@@ -281,13 +283,16 @@ footer strong{color:var(--accent-d)}
 
       <h3>📥 Demandes (à traiter)</h3>
       <p>Cet onglet liste les demandes <strong>En attente</strong> et <strong>Complément requis</strong>. Le nombre en attente s'affiche directement sur l'onglet (ex. « 📥 Demandes (3) »).</p>
+      <p><strong>Côté TeamGarantie</strong>, deux actions distinctes :</p>
       <ul class="bul">
-        <li>Pour la <strong>TeamGarantie</strong> : un clic sur une ligne ouvre directement la fenêtre de <strong>validation</strong> (statut, commentaire, prise en charge).</li>
-        <li>Pour un <strong>usager</strong> : un clic rouvre la demande pour la consulter ou la corriger.</li>
+        <li><strong>Bouton <span class="demo teal">Valider</span></strong> → ouvre la fenêtre de validation pour <strong>traiter</strong> la demande (choisir le statut, le commentaire, la prise en charge). Un e-mail récapitulatif est préparé à la validation.</li>
+        <li><strong>Clic sur la ligne</strong> (ailleurs que sur le bouton) → propose de <strong>modifier la demande</strong> : le formulaire s'ouvre pré-rempli pour corriger les champs, et l'enregistrement se fait <strong>sans envoyer d'e-mail</strong>. Idéal pour corriger une erreur de saisie.</li>
       </ul>
+      <p>Pour un <strong>usager</strong>, un clic rouvre simplement sa demande pour la consulter ou la corriger.</p>
+      <div class="note">La fenêtre de validation affiche toutes les infos utiles pour décider : kilométrage, code dommage, code avarie, et l'ensemble des <strong>vérifications KULANZ</strong> renseignées par le demandeur (TPI, OPTEVEN, tuning, pièce d'usure, entretien…), avec les réponses bloquantes signalées en rouge.</div>
 
       <h3>📋 Historique (traité)</h3>
-      <p>Cet onglet n'affiche que les demandes déjà <strong>traitées</strong>. Cliquer sur une demande la rouvre : si elle est <strong>traitée</strong>, elle s'ouvre pré-remplie pour créer rapidement une nouvelle demande similaire (même client, même réclamation).</p>
+      <p>Cet onglet n'affiche que les demandes déjà <strong>traitées</strong>. Le bouton d'une demande traitée affiche <strong>« ✓ Validée »</strong>. Cliquer sur une demande la rouvre pré-remplie pour créer rapidement une nouvelle demande similaire (même client, même réclamation).</p>
 
       <h3>Outils communs aux deux onglets</h3>
       <ul class="bul">
@@ -317,6 +322,7 @@ footer strong{color:var(--accent-d)}
         <tr><td>Traitée sans participation</td><td>Examinée mais sans participation accordée.</td></tr>
         <tr><td>Complément requis</td><td>Un document ou une information manque ; à compléter.</td></tr>
       </table>
+      <div class="tip">Dans la liste, le bouton d'action reflète le statut : <span class="demo teal">Valider</span> (en attente), <strong>✓ Validée</strong> (traitée), <strong>À compléter</strong> (complément requis).</div>
     </div>
   </section>
 
