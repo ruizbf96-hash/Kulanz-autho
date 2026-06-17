@@ -112,8 +112,23 @@ var G = {
   editingId: null,  // id de la demande rouverte pour modification (null = nouvelle demande)
   histoType: 'Kulanz', // onglet actif de l'historique : 'Kulanz' | 'CCR'
   histoSort: { key: 'date', dir: 'desc' }, // tri actif de l'historique
-  histoMode: 'pending' // 'pending' = file à traiter | 'treated' = archive
+  histoMode: 'pending', // 'pending' = file à traiter | 'treated' = archive
+  editOnly: false // true = modification d'une demande sans envoi de mail
 };
+
+// ═══════════════════════════════════════════════════════════
+// STATUTS — définition centralisée (libellé, icône, classe badge)
+// Pour ajouter/modifier un statut, ne toucher QU'ICI.
+// ═══════════════════════════════════════════════════════════
+var STATUTS = {
+  'En attente':                  { icon: '🟡', badge: 'b-wait', traite: false },
+  'Complément requis':           { icon: '🔄', badge: 'b-comp', traite: false },
+  'Traitée':                     { icon: '✅', badge: 'b-ok',   traite: true },
+  'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true }
+};
+var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
+function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
+function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // FIREBASE — init différée dans try/catch
@@ -690,6 +705,9 @@ function ssRender(key, query) {
 }
 
 function ssPick(key, code, label) {
+  // retirer un éventuel surlignage d'erreur sur ce champ et son bouton
+  var _ve = ge(key + '-val'); if (_ve && _ve.classList) _ve.classList.remove('field-error');
+  var _be = ge('ss-' + key + '-btn'); if (_be && _be.classList) _be.classList.remove('field-error');
   var cleanLabel = decodeLabel(label);
   ssState[key] = { code: code, label: cleanLabel };
   var valEl = ge(key + '-val'); if (valEl) valEl.value = code;
@@ -1002,6 +1020,7 @@ function formSnapshot() {
 
 function saveDraft() {
   if (typeof updateFormProgress === 'function') updateFormProgress();
+  G._dirty = true; // formulaire modifié non envoyé
   clearTimeout(draftTimer);
   draftTimer = setTimeout(function() {
     var b = formSnapshot();
@@ -1009,6 +1028,9 @@ function saveDraft() {
     try { var _draftKey = 'gea_draft_' + _s;
       localStorage.setItem(_draftKey, JSON.stringify(b));
       localStorage.setItem('gea_draft_last', _draftKey); } catch(e) {}
+    // Indicateur discret "✓ Enregistré"
+    var ind = ge('form-saved-ind');
+    if (ind) { ind.style.opacity = '1'; clearTimeout(window._savedIndT); window._savedIndT = setTimeout(function(){ ind.style.opacity = '0'; }, 1500); }
   }, 700);
 }
 
@@ -1129,6 +1151,7 @@ function fillFormFromRecord(b) {
 
 document.addEventListener('input',  function(e) {
   if (!e.target.closest('#mainForm')) return;
+  if (e.target.classList) e.target.classList.remove('field-error');
   saveDraft();
   updateFormProgress();
 });
@@ -1201,36 +1224,88 @@ function envoyerFormulaire() {
   var type  = (ge('f-type') && ge('f-type').value) ? ge('f-type').value : 'Kulanz';
   var isCCR = (type === 'CCR');
 
-  if (!site) { alert('\u26a0 Veuillez s\u00e9lectionner un site.'); return; }
-  if (!isValidVIN(gv('chassis'))) { alert('\u26a0 Ch\u00e2ssis invalide (17 caract\u00e8res, pas I/O/Q).'); return; }
-  if (!/^\d{6}$/.test(gv('or_number'))) { alert('\u26a0 N\u00b0 OR\u00a0: 6 chiffres requis.'); return; }
-  if (!gv('plainte_client')) { alert('\u26a0 Plainte client obligatoire.'); return; }
-  if (!ge('desig-val') || !ge('desig-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner une d\u00e9signation pi\u00e8ce.'); return; }
-  if (!ge('dom-val') || !ge('dom-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code dommage.'); return; }
-  if (!ge('ava-val') || !ge('ava-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code avarie.'); return; }
-  if (!gv('conseiller_client')) { alert('\u26a0 Le nom du demandeur est obligatoire.'); return; }
+  // === VALIDATION GROUPÉE : on collecte TOUT, on surligne, une seule alerte ===
+  // Nettoyer les surlignages précédents
+  [].forEach.call(document.querySelectorAll('.field-error'), function(el){ el.classList.remove('field-error'); });
+
+  var errs = [];
+  var mark = function(elId, msg, focusId) {
+    errs.push({ msg: msg, focusId: focusId || elId });
+    var el = ge(elId); if (el) el.classList.add('field-error');
+    // surligner aussi le bouton du select cascade si présent
+    var ssb = ge('ss-' + elId.replace('-val','') + '-btn'); if (ssb) ssb.classList.add('field-error');
+  };
+
+  if (!site) mark('site-display', 'Sélectionnez un site', 'site-display');
+  if (!isValidVIN(gv('chassis'))) mark('chassis', 'Châssis invalide (17 caractères, sans I/O/Q)', 'chassis');
+  if (!/^\d{6}$/.test(gv('or_number'))) mark('or-num', 'N° OR : 6 chiffres requis', 'or-num');
+  if (!gv('plainte_client')) mark('plainte_client', 'Plainte client obligatoire', 'plainte_client');
+  if (!ge('desig-val') || !ge('desig-val').value) mark('desig-val', 'Sélectionnez une désignation pièce', 'ss-desig-btn');
+  if (!ge('dom-val') || !ge('dom-val').value) mark('dom-val', 'Sélectionnez un code dommage', 'ss-dom-btn');
+  if (!ge('ava-val') || !ge('ava-val').value) mark('ava-val', 'Sélectionnez un code avarie', 'ss-ava-btn');
+  if (!gv('conseiller_client')) mark('conseiller_client', 'Nom du demandeur obligatoire', 'conseiller_client');
   var email = gv('email_usager');
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { alert('\u26a0 E-mail invalide.'); return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) mark('email_usager', 'E-mail invalide', 'email_usager');
   if (isCCR) {
-    if (!gr('elsa_dispo')) {
-      alert('\u26a0 Indiquez si le plan d\'entretien ELSA est disponible (Oui/Non).');
-      return;
-    }
-    if (!/^\d{9}$/.test(gv('iq_num'))) {
-      alert('\u26a0 Le num\u00e9ro IQ est obligatoire (9 chiffres).');
-      var iqEl = ge('iq-num'); if (iqEl) iqEl.focus();
-      return;
-    }
+    if (!gr('elsa_dispo')) errs.push({ msg: 'Indiquez si le plan ELSA est disponible (Oui/Non)', focusId: 'factures-wrap' });
+    if (!/^\d{9}$/.test(gv('iq_num'))) mark('iq-num', 'N° IQ obligatoire (9 chiffres)', 'iq-num');
     var chkE = ge('chk-engagement');
-    if (!chkE || !chkE.checked) {
-      alert('\u26a0 Veuillez cocher la case d\u2019engagement avant d\u2019envoyer.');
-      if (chkE) chkE.focus();
-      return;
+    if (!chkE || !chkE.checked) errs.push({ msg: 'Cochez la case d\'engagement', focusId: 'chk-engagement' });
+  }
+
+  if (errs.length) {
+    var liste = errs.map(function(e, i){ return (i+1) + '. ' + e.msg; }).join('\n');
+    alert('⚠ Merci de corriger les points suivants ('+errs.length+') :\n\n' + liste);
+    // Aller au premier champ en erreur
+    var f = ge(errs[0].focusId);
+    if (f) {
+      try { f.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
+      if (typeof f.focus === 'function') { try { f.focus({preventScroll:true}); } catch(e){ f.focus(); } }
     }
+    return;
   }
 
   var btn = ge('btn-envoyer');
   if (!btn || btn.disabled) return;
+
+  // === MODE MODIFICATION SANS ENVOI (clic ligne TeamGarantie) ===
+  if (G.editOnly && G.editingId) {
+    if (!confirm('Enregistrer les modifications de cette demande ?\n(Aucun e-mail ne sera envoyé)')) return;
+    var dEdit = collectData();
+    var orig = getDemandeById(G.editingId) || {};
+    var rec = {
+      id: orig.id, date: orig.date || new Date().toLocaleDateString('fr-FR'),
+      site: dEdit.site, type: dEdit.type, or: gv('or_number'), chassis: gv('chassis'),
+      code_dommage: dEdit.domFull,
+      desig_piece: ge('desig-val')?ge('desig-val').value:'',
+      rubrique: ge('rub-val')?ge('rub-val').value:'',
+      categorie: ge('dom-cat')?ge('dom-cat').value:'',
+      email_usager: gv('email_usager'), conseiller_client: gv('conseiller_client'),
+      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+      // on conserve le statut et les infos de traitement existants
+      statut: orig.statut || 'En attente',
+      commentaire_team: orig.commentaire_team || '',
+      commerce: orig.commerce || null
+    };
+    (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in rec)) rec[k]=snap[k]; })(formSnapshot());
+    btn.disabled = true; btn.textContent = 'Enregistrement\u2026';
+    var keyE = 'd'+String(rec.id).replace(/[^a-zA-Z0-9]/g,'');
+    var saveE = demandesRef ? demandesRef.child(keyE).set(rec) : (function(){ var i=G.demandes.findIndex(function(x){return x.id==rec.id;}); if(i!==-1) G.demandes[i]=rec; return Promise.resolve(); })();
+    Promise.resolve(saveE).then(function(){
+      try { (function(){ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); })(); } catch(e){}
+      G.editOnly = false; G.editingId = null; G._dirty = false;
+      clearReopenBanner();
+      toast('✔ Modifications enregistrées (sans envoi de mail).');
+      renderHisto(); if (G.role==='team') renderDash();
+      showPage('demandes', ge('tab-demandes'));
+    }).catch(function(e){ console.warn('Save edit:',e); toast('❌ Erreur d\'enregistrement.'); })
+    .finally(function(){
+      btn.disabled = false;
+      var _svg=btn.querySelector('svg'); btn.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande';
+    });
+    return;
+  }
+
   var _ct = 'Confirmer l\'envoi ?'
     + '\nSite : '+site+'  |  N° OR : '+gv('or_number')+'  |  Châssis : '+gv('chassis');
   if (isCCR) _ct += '\n\n⚠ Après OK : le PDF est généré et les instructions s\'affichent.';
@@ -1359,7 +1434,7 @@ function envoyerFormulaire() {
       +'\u261d\ufe0f Cliquez sur le champ puis Ctrl+C pour copier</span></div>'
       +'<br>\ud83d\udcce <strong>3.</strong> Joindre le <strong>PDF</strong> + documents justificatifs'
       +'<br>\ud83d\udce4 <strong>4.</strong> Envoyer depuis Outlook</div>';
-    ge('success-overlay').classList.add('open');
+    G._dirty = false; ge('success-overlay').classList.add('open');
     setTimeout(function(){
       btn.disabled = false;
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
@@ -1420,7 +1495,7 @@ function envoyerFormulaire() {
       '<strong>Type\u00a0:</strong> '+esc(rec.type)+'<br>'+
       '<strong>N\u00b0 OR\u00a0:</strong> '+esc(rec.or)+'<br>'+
       '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(rec.chassis);
-    ge('success-overlay').classList.add('open');
+    G._dirty = false; ge('success-overlay').classList.add('open');
   })
   .catch(function(err){ console.error(err); toast('\u274c Erreur d\'enregistrement \u2013 reessayez.'); })
   .finally(function(){
@@ -1432,6 +1507,8 @@ function envoyerFormulaire() {
 function nouvelleDemande() {
   ge('success-overlay').classList.remove('open');
   G.editingId = null;
+  G.editOnly = false;
+  G._dirty = false;
   clearReopenBanner();
   var _bv=ge('btn-envoyer');
   if(_bv){ var _svg=_bv.querySelector('svg'); _bv.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande'; }
@@ -1620,7 +1697,7 @@ function renderHisto() {
   var fSt = ge('f-stat-sel')  ? ge('f-stat-sel').value  : '';
   var mode = G.histoMode || 'pending';
   // Un dossier est "à traiter" si En attente ou Complément requis ; sinon "traité"
-  var isPending = function(d){ return d.statut==='En attente' || d.statut==='Complément requis'; };
+  var isPending = function(d){ return !statutEstTraite(d.statut); };
   var inMode = function(d){ return mode==='pending' ? isPending(d) : !isPending(d); };
 
   // Titre + colonne d'action selon le mode
@@ -1686,14 +1763,10 @@ function renderHisto() {
   if (!filtered.length) { tbody.innerHTML=''; if(empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
 
-  var BADGE = {
-    'En attente':'b-wait','Traitée':'b-ok','Traitée sans participation':'b-no','Complément requis':'b-comp'
-  };
-  var ICON = {'En attente':'🟡','Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄'};
-
   tbody.innerHTML = filtered.map(function(d) {
-    var bc   = BADGE[d.statut] || 'b-wait';
-    var ic   = ICON[d.statut]  || '🟡';
+    var _si  = statutInfo(d.statut);
+    var bc   = _si.badge;
+    var ic   = _si.icon;
     var pec  = '—';
     if (d.statut==='Traitée' && d.commerce) {
       var c=d.commerce, pts=[];
@@ -1703,7 +1776,7 @@ function renderHisto() {
       if(c.pe_de)  pts.push('<span>Pièces ext.: '+esc(c.pe_de)+'%</span>');
       if(pts.length) pec='<div style="font-size:11px;line-height:1.7">'+pts.join('')+'</div>';
     }
-    var _traitee = (d.statut === 'Traitée' || d.statut === 'Traitée sans participation');
+    var _traitee = statutEstTraite(d.statut);
     var _btnLabel = _traitee ? '✓ Validée'
       : (d.statut === 'Complément requis' ? 'À compléter' : 'Valider');
     var _btnStyle = _traitee
@@ -1872,8 +1945,12 @@ function openSPFromBtn(btn) {
 //  - sinon -> rouvre la demande (consultation / édition / duplication)
 function histoRowClick(id) {
   if (G.histoMode === 'pending' && G.role === 'team') {
-    openSP(id);
+    if (confirm('Voulez-vous modifier cette demande ?\n\nOK     → ouvrir le formulaire pour corriger et enregistrer (sans envoi de mail)\nAnnuler → ne rien faire')) {
+      G.editOnly = true;       // édition seule : enregistre sans envoyer de mail
+      openDemande(id);
+    }
   } else {
+    G.editOnly = false;
     openDemande(id);
   }
 }
@@ -1894,7 +1971,7 @@ function openDemande(id) {
   if (!d) { toast('⚠ Demande introuvable.'); return; }
 
   var statut = d.statut || 'En attente';
-  var estFinalisee = (statut === 'Traitée' || statut === 'Traitée sans participation');
+  var estFinalisee = statutEstTraite(statut);
 
   // Remettre le formulaire à zéro puis le repeupler
   if (ge('mainForm')) ge('mainForm').reset();
@@ -1906,23 +1983,26 @@ function openDemande(id) {
   fillFormFromRecord(d);
 
   // Mode : duplication (finalisée) ou modification (en cours)
-  G.editingId = estFinalisee ? null : String(id);
+  // En mode "editOnly" (clic ligne TeamGarantie), on force la modification de CETTE demande.
+  G.editingId = (G.editOnly || !estFinalisee) ? String(id) : null;
 
   // Aller sur l'onglet formulaire
   showPage('form', ge('tab-form'));
 
   // Bandeau d'information en haut du formulaire
-  showReopenBanner(estFinalisee, d);
+  showReopenBanner(G.editOnly ? false : estFinalisee, d);
 
   // Mettre à jour le libellé du bouton d'envoi
   var bv = ge('btn-envoyer');
   if (bv) {
-    var lbl = estFinalisee ? 'Créer une nouvelle demande' : 'Mettre à jour la demande';
+    var lbl = G.editOnly ? 'Enregistrer les modifications'
+            : (estFinalisee ? 'Créer une nouvelle demande' : 'Mettre à jour la demande');
     var svg = bv.querySelector('svg');
     bv.innerHTML = (svg ? svg.outerHTML : '') + ' ' + lbl;
   }
 
-  toast(estFinalisee ? '📄 Demande dupliquée — ajustez puis envoyez.' : '✏ Demande rouverte en modification.');
+  toast(G.editOnly ? '✏ Modification — enregistrez sans envoi de mail.'
+        : (estFinalisee ? '📄 Demande dupliquée — ajustez puis envoyez.' : '✏ Demande rouverte en modification.'));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1943,9 +2023,15 @@ function showReopenBanner(estFinalisee, d) {
   } else {
     div.className = 'info-box';
     div.style.cssText = 'background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px';
-    div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
-      + ' (' + esc(d.statut||'') + '). À l\'envoi, cette demande sera <strong>mise à jour</strong>. '
-      + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+    if (G.editOnly) {
+      div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
+        + ' (' + esc(d.statut||'') + '). En enregistrant, cette demande sera <strong>mise à jour sans envoi de mail</strong>. '
+        + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+    } else {
+      div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
+        + ' (' + esc(d.statut||'') + '). À l\'envoi, cette demande sera <strong>mise à jour</strong>. '
+        + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+    }
   }
   host.insertBefore(div, host.firstChild);
 }
@@ -1957,6 +2043,7 @@ function clearReopenBanner() {
 // Annule la réouverture : repart sur un formulaire vierge
 function annulerReouverture() {
   G.editingId = null;
+  G.editOnly = false;
   clearReopenBanner();
   if (typeof nouvelleDemande === 'function') nouvelleDemande();
   toast('Réouverture annulée.');
@@ -2729,3 +2816,17 @@ function checkKulanzNok() {
     initFirebase(); // Firebase initialisé dès le chargement
   }
 })();
+
+// ═══════════════════════════════════════════════════════════
+// Avertissement avant fermeture si une demande non envoyée est en cours
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('beforeunload', function(e) {
+  // Seulement si connecté, formulaire modifié, et au moins un champ clé rempli
+  if (!G.role || !G._dirty) return;
+  var rempli = (typeof gv === 'function') &&
+    (gv('chassis') || gv('or_number') || gv('plainte_client'));
+  if (!rempli) return;
+  e.preventDefault();
+  e.returnValue = ''; // message standardisé par le navigateur
+  return '';
+});
