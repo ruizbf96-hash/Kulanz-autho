@@ -516,3 +516,14 @@ tbody tr:hover td{background:var(--bg2)}
   .lp-sites{grid-template-columns:1fr}
   .lp-site.span2{max-width:100%}
 }
+
+/* Surlignage des champs en erreur (validation groupée) */
+.field-error,
+input.field-error,
+textarea.field-error,
+.ss-btn.field-error{
+  border:2px solid var(--red,#C0392B) !important;
+  background:var(--red-soft,#FBEAE8) !important;
+  border-radius:8px;
+}
+.field-error:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,43,.15)}
