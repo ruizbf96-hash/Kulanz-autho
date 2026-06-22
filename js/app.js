@@ -2,7 +2,12 @@
 
 var SITES     = ['Audi Hœnheim','Audi Obernai','SEAT Hœnheim','SEAT Illkirch','SKODA Hœnheim','SKODA Obernai','VW Bischheim','VW Illkirch','VW Obernai'];
 var KVPS_MAP  = {'Audi Hœnheim':'02155','Audi Obernai':'02486','SEAT Hœnheim':'63930','SEAT Illkirch':'02153','SKODA Hœnheim':'02376','SKODA Obernai':'02485','VW Bischheim':'02154','VW Illkirch':'02153','VW Obernai':'02485'};
-var MOT_DE_PASSE = 'Garantie2026'; // conservé pour compatibilité
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MOT DE PASSE POUR VIDER L'HISTORIQUE                          ║
+// ║  Pour le changer : remplacez la valeur entre apostrophes       ║
+// ║  ci-dessous, puis ré-uploadez js/app.js sur GitHub.            ║
+// ╚═══════════════════════════════════════════════════════════════╝
+var MOT_DE_PASSE = 'Garantie2026';
 
 // ═══════════════════════════════════════════════════
 // LISTE BLANCHE TeamGarantie
@@ -104,9 +109,26 @@ var G = {
   kulanzData: {}, // copie kulanz pour CCR
   fbListening: false,
   demandeType: 'K', // K = Kulanz, C = CCR
-  histoType: 'Kulanz', // filtre onglet historique
-  histoSort: { key: 'date', asc: false }
+  editingId: null,  // id de la demande rouverte pour modification (null = nouvelle demande)
+  histoType: 'Kulanz', // onglet actif de l'historique : 'Kulanz' | 'CCR'
+  histoSort: { key: 'date', dir: 'desc' }, // tri actif de l'historique
+  histoMode: 'pending', // 'pending' = file à traiter | 'treated' = archive
+  editOnly: false // true = modification d'une demande sans envoi de mail
 };
+
+// ═══════════════════════════════════════════════════════════
+// STATUTS — définition centralisée (libellé, icône, classe badge)
+// Pour ajouter/modifier un statut, ne toucher QU'ICI.
+// ═══════════════════════════════════════════════════════════
+var STATUTS = {
+  'En attente':                  { icon: '🟡', badge: 'b-wait', traite: false },
+  'Complément requis':           { icon: '🔄', badge: 'b-comp', traite: false },
+  'Traitée':                     { icon: '✅', badge: 'b-ok',   traite: true },
+  'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true }
+};
+var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
+function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
+function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // FIREBASE — init différée dans try/catch
@@ -145,25 +167,8 @@ function initFirebase() {
 }
 
 function startListener() {
-  if (!demandesRef || !db) return;
-  // Attendre que Firebase Auth confirme l'utilisateur avant de lire (évite permission_denied)
-  if (typeof firebase !== 'undefined' && firebase.auth) {
-    var u = firebase.auth().currentUser;
-    if (!u) {
-      // Pas encore authentifié — réessayer quand l'auth est prête
-      firebase.auth().onAuthStateChanged(function(user) {
-        if (user) { G.fbListening = false; attachListener(); }
-      });
-      return;
-    }
-  }
-  attachListener();
-}
-
-function attachListener() {
   if (G.fbListening || !demandesRef || !db) return;
   G.fbListening = true;
-  demandesRef.off(); // Nettoyer un éventuel ancien listener
   demandesRef.on('value', function(snap) {
     G.demandes = [];
     snap.forEach(function(c) { G.demandes.push(c.val()); });
@@ -172,17 +177,7 @@ function attachListener() {
     renderHisto();
     if (G.role === 'team') renderDash();
   }, function(err) {
-    console.warn('Firebase lecture:', err && err.message ? err.message : err);
-    G.fbListening = false;
-    // Si permission refusée, réessayer une fois l'auth confirmée
-    if (err && String(err.code || err.message).indexOf('permission') !== -1) {
-      if (typeof firebase !== 'undefined' && firebase.auth) {
-        firebase.auth().onAuthStateChanged(function(user) {
-          if (user && !G.fbListening) { attachListener(); }
-        });
-      }
-    }
-    // Fallback cache local en attendant
+    console.warn('Firebase offline:', err);
     try {
       var s = localStorage.getItem('gea_demandes');
       G.demandes = s ? JSON.parse(s) : [];
@@ -269,17 +264,7 @@ function vinHint(v) {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // LOGIN
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-function showStep2() {
-  ge('lp-step1').style.display = 'none';
-  ge('lp-step2').style.display = 'block';
-  // Montrer d'abord la sélection de site
-  if (ge('site-select-step')) ge('site-select-step').style.display = 'block';
-  if (ge('auth-form')) ge('auth-form').style.display = 'none';
-}
-function showStep1() {
-  ge('lp-step2').style.display = 'none';
-  ge('lp-step1').style.display = 'block';
-}
+// showStep1() / showStep2() sont definis dans index.html (gestion robuste des 3 etapes du login).
 function openPwdModal() {
   ge('pwd-modal').classList.add('open');
   setTimeout(function() { ge('pwd-input').focus(); }, 100);
@@ -315,60 +300,7 @@ function focusAuthPwd() {
   var p = ge('auth-pwd'); if (p) p.focus();
 }
 
-function connecterUsager() {
-  var email = (ge('auth-email') ? ge('auth-email').value : '').trim();
-  var pwd   = ge('auth-pwd')   ? ge('auth-pwd').value   : '';
-  var err   = ge('auth-error');
-
-  // Validation e-mail @geauto.fr
-  if (!email) {
-    if (err) { err.textContent = 'Saisissez votre e-mail.'; err.style.display = 'block'; }
-    ge('auth-email').focus(); return;
-  }
-  if (!email.toLowerCase().endsWith('@geauto.fr')) {
-    if (err) { err.textContent = 'Utilisez votre e-mail professionnel @geauto.fr'; err.style.display = 'block'; }
-    ge('auth-email').focus(); return;
-  }
-  if (!pwd) {
-    if (err) { err.textContent = 'Saisissez votre mot de passe.'; err.style.display = 'block'; }
-    ge('auth-pwd').focus(); return;
-  }
-  if (err) err.style.display = 'none';
-
-  // Bouton en chargement
-  var btn = document.querySelector('#lp-step2 button[onclick="connecterUsager()"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
-
-  // Firebase Auth — s'assurer que Firebase est initialisé
-  if (typeof firebase === 'undefined') {
-    if (err) { err.textContent = 'Erreur : Firebase non chargé. Rechargez la page.'; err.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    return;
-  }
-  // Initialiser Firebase si pas encore fait
-  if (!firebase.apps || !firebase.apps.length) { initFirebase(); }
-  if (!firebase.auth || typeof firebase.auth !== 'function') {
-    if (err) { err.textContent = 'Service auth indisponible. Rechargez la page.'; err.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    return;
-  }
-
-  firebase.auth().signInWithEmailAndPassword(email, pwd)
-    .then(function() {
-      G.role = 'usager';
-      // G.site déjà défini par loginUsager()
-      ouvrirApp();
-    })
-    .catch(function(e) {
-      var msg = 'E-mail ou mot de passe incorrect.';
-      if (e.code === 'auth/user-not-found')   msg = 'Compte introuvable. Contactez teamgarantie@geauto.fr';
-      if (e.code === 'auth/wrong-password')   msg = 'Mot de passe incorrect.';
-      if (e.code === 'auth/invalid-email')    msg = 'E-mail invalide.';
-      if (e.code === 'auth/too-many-requests')msg = 'Trop de tentatives. Réessayez dans quelques minutes.';
-      if (err) { err.textContent = msg; err.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
-    });
-}
+// connecterUsager() est defini dans index.html (flux de connexion Firebase a jour).
 
 function deconnecterUsager() {
   if (firebase && firebase.auth) {
@@ -382,6 +314,7 @@ function ouvrirApp() {
   var mh = ge('main-header') || document.querySelector('header');
   if (mh) mh.style.display = '';
   ge('h-user').style.display = 'flex';
+  if (ge('tab-demandes')) ge('tab-demandes').style.display = 'block';
   ge('tab-histo').style.display = 'block';
 
   if (G.role === 'team') {
@@ -435,6 +368,32 @@ function ouvrirApp() {
   restoreDraft();
 }
 
+// Permet à l'utilisateur CONNECTÉ de changer lui-même son mot de passe.
+function changerMonMdp() {
+  var user = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!user) { toast('⚠ Vous devez être connecté.'); return; }
+
+  var p1 = prompt('Nouveau mot de passe (6 caractères minimum) :');
+  if (p1 === null) return;                 // annulé
+  p1 = (p1 || '').trim();
+  if (p1.length < 6) { alert('Le mot de passe doit contenir au moins 6 caractères.'); return; }
+  var p2 = prompt('Confirmez le nouveau mot de passe :');
+  if (p2 === null) return;
+  if (p1 !== (p2 || '').trim()) { alert('Les deux mots de passe ne correspondent pas.'); return; }
+
+  user.updatePassword(p1)
+    .then(function(){ alert('✅ Mot de passe mis à jour avec succès.'); })
+    .catch(function(e){
+      if (e && e.code === 'auth/requires-recent-login') {
+        alert('Pour des raisons de sécurité, veuillez vous déconnecter puis vous reconnecter, et réessayer immédiatement après.');
+      } else if (e && e.code === 'auth/weak-password') {
+        alert('Mot de passe trop faible (6 caractères minimum).');
+      } else {
+        alert('⚠️ Erreur : ' + (e && e.message ? e.message : 'réessayez.'));
+      }
+    });
+}
+
 function deconnecter() {
   deconnecterUsager();
   G.role = ''; G.site = ''; G.fbListening = false;
@@ -444,13 +403,15 @@ function deconnecter() {
   if (!document.querySelector('style[data-antiflash]')) {
     var s=document.createElement('style');
     s.setAttribute('data-antiflash','1');
-    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;background:#0f1923!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
+    s.textContent='#page-form,#page-histo,#sp-overlay,#side-panel,#vider-modal,#toast,#success-overlay,header{display:none!important}'+'#login-page{display:flex!important;align-items:center!important;justify-content:center!important;overflow-y:auto!important}';
     document.head.appendChild(s);
   }
   ge('login-page').classList.remove('hidden');
   ge('lp-step1').style.display = 'block';
   ge('lp-step2').style.display = 'none';
+  if (ge('lp-step3')) ge('lp-step3').style.display = 'none';
   ge('h-user').style.display = 'none';
+  if (ge('tab-demandes')) ge('tab-demandes').style.display = 'none';
   ge('tab-histo').style.display = 'none';
   ge('dash-wrap').classList.remove('on');
   ge('h-alert').classList.remove('on');
@@ -471,10 +432,14 @@ function deconnecter() {
 function showPage(page, tabEl) {
   [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
   [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
-  ge('page-'+page).classList.add('active');
+  // 'demandes' et 'histo' partagent la même page (page-histo) avec un mode différent
+  var realPage = (page === 'demandes') ? 'histo' : page;
+  if (page === 'demandes') G.histoMode = 'pending';
+  else if (page === 'histo') G.histoMode = 'treated';
+  ge('page-'+realPage).classList.add('active');
   if (tabEl) tabEl.classList.add('active');
   ge('type-bar').style.display = (page === 'form') ? 'flex' : 'none';
-  if (page === 'histo') renderHisto();
+  if (realPage === 'histo') renderHisto();
 }
 
 function selectSite(btn, name) {
@@ -495,8 +460,11 @@ function setType(t) {
   else {
     // Reset champs CCR
     [].forEach.call(document.querySelectorAll('[name="pieces[]"]'), function(cb) { cb.checked = false; });
-    [].forEach.call(document.querySelectorAll('[name="kulanz_done"],[name="cig"]'), function(r) { r.checked = false; });
+    [].forEach.call(document.querySelectorAll('[name="kulanz_done"],[name="cig"],[name="elsa_dispo"]'), function(r) { r.checked = false; });
     var ct = ge('cig-taux'); if (ct) { ct.value = ''; ct.disabled = true; }
+    var iqEl = ge('iq-num'); if (iqEl) { iqEl.value = ''; iqEl.className=''; }
+    var iqH = ge('iq-hint'); if (iqH) { iqH.textContent = '0 / 9 chiffres'; iqH.className='hint'; }
+    var fw = ge('factures-wrap'); if (fw) fw.style.display = 'none';
   }
   ge('btn-k').classList.toggle('active', isK);
   // Afficher/cacher la case engagement CCR
@@ -516,6 +484,7 @@ function setType(t) {
   [].forEach.call(document.querySelectorAll('.c-section'), function(el) { el.style.display = !isK ? 'block' : 'none'; });
   ge('comm-num').textContent = isK ? '4' : '6';
   ge('btn-copy-kulanz').style.display = isK ? 'flex' : 'none';
+  if (typeof updateFormProgress === 'function') updateFormProgress();
 }
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -736,6 +705,9 @@ function ssRender(key, query) {
 }
 
 function ssPick(key, code, label) {
+  // retirer un éventuel surlignage d'erreur sur ce champ et son bouton
+  var _ve = ge(key + '-val'); if (_ve && _ve.classList) _ve.classList.remove('field-error');
+  var _be = ge('ss-' + key + '-btn'); if (_be && _be.classList) _be.classList.remove('field-error');
   var cleanLabel = decodeLabel(label);
   ssState[key] = { code: code, label: cleanLabel };
   var valEl = ge(key + '-val'); if (valEl) valEl.value = code;
@@ -925,6 +897,24 @@ function onOR(input) {
   input.className = v.length===6 ? 'ok' : v.length ? 'invalid' : '';
 }
 
+// CCR : affiche le bloc Factures uniquement si le plan ELSA n'est pas disponible
+function onElsaChange() {
+  var val = gr('elsa_dispo');
+  var wrap = ge('factures-wrap');
+  if (wrap) wrap.style.display = (val === 'NON') ? 'block' : 'none';
+  saveDraft();
+}
+
+// CCR : IQ n° = 9 chiffres
+function onIqInput(input) {
+  var v = input.value.replace(/\D/g,'').slice(0,9);
+  input.value = v;
+  var hint = ge('iq-hint');
+  if (hint) { hint.textContent = v.length+' / 9 chiffres'; hint.className = 'hint'+(v.length===9?' ok':v.length?' err':''); }
+  input.className = v.length===9 ? 'ok' : v.length ? 'invalid' : '';
+  saveDraft();
+}
+
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // KULANZ SAVE / COPY
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1000,32 +990,47 @@ function copyKulanz() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 var draftTimer = null;
 
+// Capture COMPLÈTE de l'état du formulaire (tous les champs + réponses KULANZ).
+// Utilisée pour le brouillon ET pour enregistrer toutes les données d'une demande.
+function formSnapshot() {
+  var b = {
+    site: ge('f-site').value, type: ge('f-type').value,
+    chassis: gv('chassis'), kilometrage: gv('kilometrage'),
+    or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
+    conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
+    plainte_client: gv('plainte_client'),
+    emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
+    desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
+    dom_cat: ge('dom-cat') ? ge('dom-cat').value : '',
+    dom_rub: ge('rub-val') ? ge('rub-val').value : '',
+    dom_code: ge('dom-val') ? ge('dom-val').value : '',
+    dom_lbl: ge('dom-lbl') ? ge('dom-lbl').value : '',
+    ava_code: ge('ava-val') ? ge('ava-val').value : '',
+    ava_lbl: ge('ava-lbl') ? ge('ava-lbl').value : ''
+  };
+  var _s = ge('f-site') ? ge('f-site').value : '';
+  var _q = (typeof KULANZ_BY_BRAND!=='undefined' && typeof SITE_BRAND!=='undefined')
+    ? (KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]) : [];
+  _q.forEach(function(q){ b['k_'+q.name] = gr(q.name) || ''; });
+  b.num_tpi = gv('num_tpi') || '';
+  b.iq_num = gv('iq_num') || '';
+  b.elsa_dispo = gr('elsa_dispo') || '';
+  return b;
+}
+
 function saveDraft() {
+  if (typeof updateFormProgress === 'function') updateFormProgress();
+  G._dirty = true; // formulaire modifié non envoyé
   clearTimeout(draftTimer);
   draftTimer = setTimeout(function() {
-    var b = {
-      site: ge('f-site').value, type: ge('f-type').value,
-      chassis: gv('chassis'), kilometrage: gv('kilometrage'),
-      or_number: gv('or_number'), date_or: gv('date_or'), kvps: gv('kvps'),
-      conseiller_client: gv('conseiller_client'), email_usager: gv('email_usager'),
-      plainte_client: gv('plainte_client'),
-      emplacement: gv('emplacement'), ref_piece: gv('ref_piece'),
-      desig_piece: (ge('desig-val')?ge('desig-val').value:''), commentaires: gv('commentaires'),
-      dom_cat: ge('dom-cat') ? ge('dom-cat').value : '',
-      dom_rub: ge('rub-val') ? ge('rub-val').value : '',
-      dom_code: ge('dom-val') ? ge('dom-val').value : '',
-      dom_lbl: ge('dom-lbl') ? ge('dom-lbl').value : '',
-      ava_code: ge('ava-val') ? ge('ava-val').value : '',
-      ava_lbl: ge('ava-lbl') ? ge('ava-lbl').value : ''
-    };
-    var _s=ge('f-site')?ge('f-site').value:'';
-    var _q=(typeof KULANZ_BY_BRAND!=='undefined'&&typeof SITE_BRAND!=='undefined')
-      ?(KULANZ_BY_BRAND[SITE_BRAND[_s]||'VW']||[]):[];
-    _q.forEach(function(q){b['k_'+q.name]=gr(q.name)||'';});
-    b.num_tpi=gv('num_tpi')||'';
-    try { var _draftKey = 'gea_draft_' + (_s || 'default');
+    var b = formSnapshot();
+    var _s = b.site || 'default';
+    try { var _draftKey = 'gea_draft_' + _s;
       localStorage.setItem(_draftKey, JSON.stringify(b));
       localStorage.setItem('gea_draft_last', _draftKey); } catch(e) {}
+    // Indicateur discret "✓ Enregistré"
+    var ind = ge('form-saved-ind');
+    if (ind) { ind.style.opacity = '1'; clearTimeout(window._savedIndT); window._savedIndT = setTimeout(function(){ ind.style.opacity = '0'; }, 1500); }
   }, 700);
 }
 
@@ -1047,68 +1052,108 @@ function restoreDraft() {
       (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })();
       return;
     }
-    // Restaurer le site uniquement si valide
-    if (b.site && SITES.indexOf(b.site) !== -1 && G.role === 'team') {
-      ge('f-site').value = b.site;
-      ge('h-site-name').textContent = b.site;
-      [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
-    }
-    ['chassis','kilometrage','or_number','kvps','conseiller_client','email_usager',
-     'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
-      if (b[n]) sv(n, b[n]);
-    });
-    if (b.date_or && /^\d{4}-\d{2}-\d{2}$/.test(b.date_or)) sv('date_or', b.date_or);
-    if (b.dom_cat) {
-      var ci=ge('dom-cat'); if(ci)ci.value=b.dom_cat;
-      var cb=document.querySelector('.cat-btn[data-cat="'+b.dom_cat+'"]');
-      if(cb)cb.classList.add('active');
-      var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+b.dom_cat;ch.className='hint ok';}
-    }
-    if (b.dom_rub) {
-      var rv=ge('rub-val'); if(rv)rv.value=b.dom_rub;
-      ssState['rub']={code:b.dom_rub,label:b.dom_rub};
-      var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
-        var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=b.dom_rub;}
-    }
-    if (b.desig_piece) {
-      var dv=ge('desig-val'); if(dv)dv.value=b.desig_piece;
-      ssState['desig']={code:b.desig_piece,label:b.desig_piece};
-      var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
-        var dbt=db.querySelector('.ss-txt');if(dbt)dbt.textContent=b.desig_piece;}
-    }
-    if (b.dom_code) {
-      var dv2=ge('dom-val'); if(dv2)dv2.value=b.dom_code;
-      ssState['dom']={code:b.dom_code,label:b.dom_lbl||b.dom_code};
-      var dm=ge('ss-dom-btn'); if(dm){dm.classList.add('filled');
-        var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=b.dom_code;}
-    }
-    // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer
-    var draftSite = (b.site && SITES.indexOf(b.site) !== -1) ? b.site : (ge('f-site')?ge('f-site').value:'');
-    if (draftSite) renderKulanzForm(draftSite);
-    ssSet('ava', b.ava_code, b.ava_lbl);
-    if (b.type === 'CCR') setType('C');
-    if (b.chassis) onChassis(ge('chassis'));
-    // Restaurer les réponses KULANZ
-    if (qs) {
-      var brandQs = typeof KULANZ_BY_BRAND!=='undefined'?KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[]:[];
-      brandQs.forEach(function(q){
-        var val = b['k_'+q.name];
-        if (val) {
-          var radios = document.querySelectorAll('[name="'+q.name+'"]');
-          [].forEach.call(radios, function(r){ r.checked = (r.value===val); });
-        }
-      });
-      if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
-    }
-    checkKulanzNok();
+    fillFormFromRecord(b);
     toast('✔ Brouillon restauré !');
   } catch(e) { console.warn('Draft restore error:', e); }
 }
 
+// Remplit le formulaire à partir d'un objet (brouillon OU demande enregistrée).
+// Accepte les deux schémas de noms : brouillon (or_number/dom_*) et enregistrement (or/code_dommage…).
+function fillFormFromRecord(b) {
+  if (!b) return;
+  // Normaliser les variantes de noms de champs entre brouillon et demande stockée
+  var or_number = b.or_number || b.or || '';
+  var dom_cat   = b.dom_cat   || b.categorie || '';
+  var dom_rub   = b.dom_rub   || b.rubrique  || '';
+  var desig     = b.desig_piece || '';
+
+  // Restaurer le site (team : on l'applique ; usager : déjà fixé par son login)
+  if (b.site && SITES.indexOf(b.site) !== -1 && G.role === 'team') {
+    ge('f-site').value = b.site;
+    ge('h-site-name').textContent = b.site;
+    [].forEach.call(document.querySelectorAll('.s-btn'), function(btn) { btn.classList.toggle('active', btn.textContent.trim()===b.site); });
+  }
+  var draftSite = (b.site && SITES.indexOf(b.site) !== -1)
+    ? b.site
+    : (ge('f-site') ? ge('f-site').value : '');
+  // KVPS + champs site (jamais laissés vides)
+  if (draftSite) {
+    var kvpsEl3 = ge('kvps');
+    if (kvpsEl3) kvpsEl3.value = (b.kvps && String(b.kvps).trim()) ? b.kvps : (KVPS_MAP[draftSite] || '');
+    var sdEl3 = ge('site-display'); if (sdEl3) sdEl3.value = draftSite;
+    var siteFieldEl = ge('site-field'); if (siteFieldEl) siteFieldEl.style.display = 'flex';
+  }
+  // Champs texte simples
+  if (or_number) sv('or_number', or_number);
+  ['chassis','kilometrage','conseiller_client','email_usager',
+   'plainte_client','emplacement','ref_piece','commentaires'].forEach(function(n) {
+    if (b[n]) sv(n, b[n]);
+  });
+  if (b.date_or && /^\d{4}-\d{2}-\d{2}$/.test(b.date_or)) sv('date_or', b.date_or);
+  // Catégorie
+  if (dom_cat) {
+    var ci=ge('dom-cat'); if(ci)ci.value=dom_cat;
+    var cb=document.querySelector('.cat-btn[data-cat="'+dom_cat+'"]');
+    if(cb)cb.classList.add('active');
+    var ch=ge('cat-hint'); if(ch){ch.textContent='✔ '+dom_cat;ch.className='hint ok';}
+  }
+  // Rubrique
+  if (dom_rub) {
+    var rv=ge('rub-val'); if(rv)rv.value=dom_rub;
+    ssState['rub']={code:dom_rub,label:dom_rub};
+    var rb=ge('ss-rub-btn'); if(rb){rb.classList.add('filled');
+      var rt=rb.querySelector('.ss-txt');if(rt)rt.textContent=dom_rub;}
+  }
+  // Désignation
+  if (desig) {
+    var dv=ge('desig-val'); if(dv)dv.value=desig;
+    ssState['desig']={code:desig,label:desig};
+    var db=ge('ss-desig-btn'); if(db){db.classList.add('filled');
+      var dbt=db.querySelector('.ss-txt');if(dbt)dbt.textContent=desig;}
+  }
+  // Code dommage : brouillon a dom_code/dom_lbl ; enregistrement a "code — libellé" dans code_dommage
+  var dCode = b.dom_code || '', dLbl = b.dom_lbl || '';
+  if (!dCode && b.code_dommage) {
+    var parts = String(b.code_dommage).split(' — ');
+    dCode = parts[0] || ''; dLbl = parts[1] || '';
+  }
+  if (dCode) {
+    var dv2=ge('dom-val'); if(dv2)dv2.value=dCode;
+    var dl=ge('dom-lbl'); if(dl)dl.value=dLbl;
+    ssState['dom']={code:dCode,label:dLbl||dCode};
+    var dm=ge('ss-dom-btn'); if(dm){dm.classList.add('filled');
+      var dmt=dm.querySelector('.ss-txt');if(dmt)dmt.textContent=dCode+(dLbl?' — '+dLbl:'');}
+  }
+  // Re-rendre le formulaire KULANZ pour le bon site avant de restaurer les réponses
+  if (draftSite) renderKulanzForm(draftSite);
+  if (b.ava_code) ssSet('ava', b.ava_code, b.ava_lbl);
+  if ((b.type === 'CCR')) setType('C');
+  if (b.chassis) onChassis(ge('chassis'));
+  // Réponses KULANZ
+  if (typeof KULANZ_BY_BRAND !== 'undefined') {
+    var brandQs = KULANZ_BY_BRAND[SITE_BRAND[draftSite]||'VW']||[];
+    brandQs.forEach(function(q){
+      var val = b['k_'+q.name];
+      if (val) {
+        var radios = document.querySelectorAll('[name="'+q.name+'"]');
+        [].forEach.call(radios, function(r){ r.checked = (r.value===val); });
+      }
+    });
+    if (b.num_tpi) { sv('num_tpi', b.num_tpi); toggleTpiField(true); }
+  }
+  // CCR : IQ + plan ELSA
+  if (b.iq_num) { sv('iq_num', b.iq_num); var iqEl=ge('iq-num'); if(iqEl) onIqInput(iqEl); }
+  if (b.elsa_dispo) {
+    var er=document.querySelector('[name="elsa_dispo"][value="'+b.elsa_dispo+'"]'); if(er){ er.checked=true; onElsaChange(); }
+  }
+  checkKulanzNok();
+}
+
 document.addEventListener('input',  function(e) {
   if (!e.target.closest('#mainForm')) return;
+  if (e.target.classList) e.target.classList.remove('field-error');
   saveDraft();
-  // Si l'usager modifie manuellement la désignation pièce, désactiver l'auto-fill
+  updateFormProgress();
 });
 document.addEventListener('change', function(e) {
   if (!e.target.closest('#mainForm')) return;
@@ -1118,6 +1163,7 @@ document.addEventListener('change', function(e) {
   // Déclencher checkKulanzNok sur tout radio dans la section KULANZ
   var kzone = ge('kulanz-questions');
   if (kzone && kzone.contains(e.target)) checkKulanzNok();
+  updateFormProgress();
 });
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1178,27 +1224,88 @@ function envoyerFormulaire() {
   var type  = (ge('f-type') && ge('f-type').value) ? ge('f-type').value : 'Kulanz';
   var isCCR = (type === 'CCR');
 
-  if (!site) { alert('\u26a0 Veuillez s\u00e9lectionner un site.'); return; }
-  if (!isValidVIN(gv('chassis'))) { alert('\u26a0 Ch\u00e2ssis invalide (17 caract\u00e8res, pas I/O/Q).'); return; }
-  if (!/^\d{6}$/.test(gv('or_number'))) { alert('\u26a0 N\u00b0 OR\u00a0: 6 chiffres requis.'); return; }
-  if (!gv('plainte_client')) { alert('\u26a0 Plainte client obligatoire.'); return; }
-  if (!ge('desig-val') || !ge('desig-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner une d\u00e9signation pi\u00e8ce.'); return; }
-  if (!ge('dom-val') || !ge('dom-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code dommage.'); return; }
-  if (!ge('ava-val') || !ge('ava-val').value) { alert('\u26a0 Veuillez s\u00e9lectionner un code avarie.'); return; }
-  if (!gv('conseiller_client')) { alert('\u26a0 Le nom du demandeur est obligatoire.'); return; }
+  // === VALIDATION GROUPÉE : on collecte TOUT, on surligne, une seule alerte ===
+  // Nettoyer les surlignages précédents
+  [].forEach.call(document.querySelectorAll('.field-error'), function(el){ el.classList.remove('field-error'); });
+
+  var errs = [];
+  var mark = function(elId, msg, focusId) {
+    errs.push({ msg: msg, focusId: focusId || elId });
+    var el = ge(elId); if (el) el.classList.add('field-error');
+    // surligner aussi le bouton du select cascade si présent
+    var ssb = ge('ss-' + elId.replace('-val','') + '-btn'); if (ssb) ssb.classList.add('field-error');
+  };
+
+  if (!site) mark('site-display', 'Sélectionnez un site', 'site-display');
+  if (!isValidVIN(gv('chassis'))) mark('chassis', 'Châssis invalide (17 caractères, sans I/O/Q)', 'chassis');
+  if (!/^\d{6}$/.test(gv('or_number'))) mark('or-num', 'N° OR : 6 chiffres requis', 'or-num');
+  if (!gv('plainte_client')) mark('plainte_client', 'Plainte client obligatoire', 'plainte_client');
+  if (!ge('desig-val') || !ge('desig-val').value) mark('desig-val', 'Sélectionnez une désignation pièce', 'ss-desig-btn');
+  if (!ge('dom-val') || !ge('dom-val').value) mark('dom-val', 'Sélectionnez un code dommage', 'ss-dom-btn');
+  if (!ge('ava-val') || !ge('ava-val').value) mark('ava-val', 'Sélectionnez un code avarie', 'ss-ava-btn');
+  if (!gv('conseiller_client')) mark('conseiller_client', 'Nom du demandeur obligatoire', 'conseiller_client');
   var email = gv('email_usager');
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { alert('\u26a0 E-mail invalide.'); return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) mark('email_usager', 'E-mail invalide', 'email_usager');
   if (isCCR) {
+    if (!gr('elsa_dispo')) errs.push({ msg: 'Indiquez si le plan ELSA est disponible (Oui/Non)', focusId: 'factures-wrap' });
+    if (!/^\d{9}$/.test(gv('iq_num'))) mark('iq-num', 'N° IQ obligatoire (9 chiffres)', 'iq-num');
     var chkE = ge('chk-engagement');
-    if (!chkE || !chkE.checked) {
-      alert('\u26a0 Veuillez cocher la case d\u2019engagement avant d\u2019envoyer.');
-      if (chkE) chkE.focus();
-      return;
+    if (!chkE || !chkE.checked) errs.push({ msg: 'Cochez la case d\'engagement', focusId: 'chk-engagement' });
+  }
+
+  if (errs.length) {
+    var liste = errs.map(function(e, i){ return (i+1) + '. ' + e.msg; }).join('\n');
+    alert('⚠ Merci de corriger les points suivants ('+errs.length+') :\n\n' + liste);
+    // Aller au premier champ en erreur
+    var f = ge(errs[0].focusId);
+    if (f) {
+      try { f.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
+      if (typeof f.focus === 'function') { try { f.focus({preventScroll:true}); } catch(e){ f.focus(); } }
     }
+    return;
   }
 
   var btn = ge('btn-envoyer');
   if (!btn || btn.disabled) return;
+
+  // === MODE MODIFICATION SANS ENVOI (clic ligne TeamGarantie) ===
+  if (G.editOnly && G.editingId) {
+    if (!confirm('Enregistrer les modifications de cette demande ?\n(Aucun e-mail ne sera envoyé)')) return;
+    var dEdit = collectData();
+    var orig = getDemandeById(G.editingId) || {};
+    var rec = {
+      id: orig.id, date: orig.date || new Date().toLocaleDateString('fr-FR'),
+      site: dEdit.site, type: dEdit.type, or: gv('or_number'), chassis: gv('chassis'),
+      code_dommage: dEdit.domFull,
+      desig_piece: ge('desig-val')?ge('desig-val').value:'',
+      rubrique: ge('rub-val')?ge('rub-val').value:'',
+      categorie: ge('dom-cat')?ge('dom-cat').value:'',
+      email_usager: gv('email_usager'), conseiller_client: gv('conseiller_client'),
+      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+      // on conserve le statut et les infos de traitement existants
+      statut: orig.statut || 'En attente',
+      commentaire_team: orig.commentaire_team || '',
+      commerce: orig.commerce || null
+    };
+    (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in rec)) rec[k]=snap[k]; })(formSnapshot());
+    btn.disabled = true; btn.textContent = 'Enregistrement\u2026';
+    var keyE = 'd'+String(rec.id).replace(/[^a-zA-Z0-9]/g,'');
+    var saveE = demandesRef ? demandesRef.child(keyE).set(rec) : (function(){ var i=G.demandes.findIndex(function(x){return x.id==rec.id;}); if(i!==-1) G.demandes[i]=rec; return Promise.resolve(); })();
+    Promise.resolve(saveE).then(function(){
+      try { (function(){ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); })(); } catch(e){}
+      G.editOnly = false; G.editingId = null; G._dirty = false;
+      clearReopenBanner();
+      toast('✔ Modifications enregistrées (sans envoi de mail).');
+      renderHisto(); if (G.role==='team') renderDash();
+      showPage('demandes', ge('tab-demandes'));
+    }).catch(function(e){ console.warn('Save edit:',e); toast('❌ Erreur d\'enregistrement.'); })
+    .finally(function(){
+      btn.disabled = false;
+      var _svg=btn.querySelector('svg'); btn.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande';
+    });
+    return;
+  }
+
   var _ct = 'Confirmer l\'envoi ?'
     + '\nSite : '+site+'  |  N° OR : '+gv('or_number')+'  |  Châssis : '+gv('chassis');
   if (isCCR) _ct += '\n\n⚠ Après OK : le PDF est généré et les instructions s\'affichent.';
@@ -1210,33 +1317,50 @@ function envoyerFormulaire() {
     btn.disabled = true; btn.textContent = 'Pr\u00e9paration\u2026';
     try { genererPDF(); } catch(e) { console.warn('PDF:', e); }
     // Corps mail: texte ASCII pur (pas de caracteres speciaux) pour eviter surcharge URL
+    var _elsa = gr('elsa_dispo') || '-';
+    var _fact = '';
+    if (_elsa === 'NON') {
+      var _pcs = []; [].forEach.call(document.querySelectorAll('[name="pieces[]"]:checked'), function(el){ _pcs.push(el.value); });
+      _fact = _pcs.filter(function(x){return x.indexOf('Factures')===0;}).join(', ') || 'aucune';
+    }
+    var _devis = document.querySelector('[name="pieces[]"][value="Devis"]:checked') ? 'oui' : 'non';
+    var _fct   = document.querySelector('[name="pieces[]"][value="Feuille Commentaire Technicien"]:checked') ? 'oui' : 'non';
+
     var corps = 'DEMANDE CCR - ' + site + '\n';
+    corps += 'A: ' + (gv('email_usager')||'-') + '  |  CC: teamgarantie@geauto.fr\n';
     corps += 'N OR: ' + gv('or_number') + '  |  Chassis: ' + gv('chassis') + '\n';
-    corps += 'Conseiller client: ' + gv('conseiller_client') + '  |  Email: ' + gv('email_usager') + '\n';
-    corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '\n';
-    corps += 'Kilometrage: ' + (gv('kilometrage')||'') + '\n\n';
-    corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
+    corps += 'Conseiller client: ' + gv('conseiller_client') + '\n';
+    corps += 'KVPS: ' + (gv('kvps')||'') + '  |  Date OR: ' + (gv('date_or')||'') + '  |  Km: ' + (gv('kilometrage')||'') + '\n\n';
     corps += 'NATURE DOMMAGE:\n';
     corps += 'Categorie: ' + (ge('dom-cat')?ge('dom-cat').value:'') + '\n';
     corps += 'Rubrique: ' + (ge('rub-val')?ge('rub-val').value:'') + '\n';
-    corps += 'Designation: ' + (ge('desig-val')?ge('desig-val').value:'') + '\n';
+    corps += 'Designation piece: ' + (ge('desig-val')?ge('desig-val').value:'') + '\n';
     corps += 'Code dommage: ' + (ge('dom-val')?ge('dom-val').value:'') + '\n';
     corps += 'Code avarie: ' + (ge('ava-val')?ge('ava-val').value:'') + '\n';
     corps += 'Emplacement: ' + (gv('emplacement')||'') + '\n\n';
-    corps += '--- ETAPES ---\n';
-    corps += '1. Joindre le PDF Demande CCR\n';
-    corps += '2. Joindre les documents justificatifs\n';
-    corps += '3. Envoyer depuis Outlook\n';
-    corps += '\nTeam Garantie GEA - VW';
+    corps += 'PIECES A FOURNIR:\n';
+    corps += 'Plan ELSA disponible: ' + _elsa + '\n';
+    if (_elsa === 'NON') corps += 'Factures fournies: ' + _fact + '\n';
+    corps += 'IQ n: ' + (gv('iq_num')||'-') + '\n';
+    corps += 'Devis: ' + _devis + '\n';
+    corps += 'Feuille Commentaire Technicien: ' + _fct + '\n\n';
+    corps += 'PLAINTE CLIENT:\n' + (gv('plainte_client')||'') + '\n\n';
+    corps += 'A joindre: PDF Demande CCR + justificatifs, puis envoyer depuis Outlook.\n';
+    corps += 'Team Garantie GEA - VW';
     var kvps2   = gv('kvps') || site;
     var subject = 'Demande CCR - ' + kvps2 + ' - ' + site + ' - ' + gv('chassis') + ' - ' + gv('conseiller_client');
     window._lastSubject = subject; // Stocké pour copierObjetMail()
-    // Limiter a 1000 chars pour garantir compatibilite tous clients mail
-    var corpsLimite = corps.length > 1000
-      ? corps.substring(0, 1000) + '\n[Voir PDF pour details complets]'
+    // Limiter pour compatibilite clients mail, mais assez large pour contenir codes + plainte
+    var corpsLimite = corps.length > 1800
+      ? corps.substring(0, 1800) + '\n[Voir PDF pour details complets]'
       : corps;
-    var mailto  = 'mailto:teamgarantie@geauto.fr'
+    // Destinataire = usager qui a généré la demande ; teamgarantie en copie (CC)
+    var _destCCR = (gv('email_usager') || '').trim() || 'teamgarantie@geauto.fr';
+    var _ccCCR   = (_destCCR.toLowerCase() !== 'teamgarantie@geauto.fr')
+                 ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
+    var mailto  = 'mailto:' + _destCCR
                 + '?subject=' + encodeURIComponent(subject)
+                + _ccCCR
                 + '&body='    + encodeURIComponent(corpsLimite);
     // Ouvrir Outlook — méthode universelle Chrome/Firefox/Edge
     // createElement + click = jamais bloqué car c'est un geste utilisateur direct
@@ -1263,6 +1387,10 @@ function envoyerFormulaire() {
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
       statut: 'En attente', commentaire_team: '', commerce: null
     };
+    // Conserver TOUS les champs du formulaire (plainte, emplacement, réponses KULANZ, codes séparés…)
+    (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in newD)) newD[k]=snap[k]; })(formSnapshot());
+    // Mode modification : réutiliser l'id et la date d'origine
+    if (G.editingId) { var _o=getDemandeById(G.editingId); if(_o){ newD.id=_o.id; newD.date=_o.date||newD.date; } }
     if (demandesRef) demandesRef.child('d'+newD.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD).catch(function(e){console.warn('Firebase CCR:',e);});
     else G.demandes.unshift(newD);
     try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
@@ -1306,7 +1434,7 @@ function envoyerFormulaire() {
       +'\u261d\ufe0f Cliquez sur le champ puis Ctrl+C pour copier</span></div>'
       +'<br>\ud83d\udcce <strong>3.</strong> Joindre le <strong>PDF</strong> + documents justificatifs'
       +'<br>\ud83d\udce4 <strong>4.</strong> Envoyer depuis Outlook</div>';
-    ge('success-overlay').classList.add('open');
+    G._dirty = false; ge('success-overlay').classList.add('open');
     setTimeout(function(){
       btn.disabled = false;
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
@@ -1318,49 +1446,58 @@ function envoyerFormulaire() {
   var msg = '\u2550'.repeat(40)+'\nDEMANDE '+d.type.toUpperCase()+' \u2014 '+d.site+'\n'+'\u2550'.repeat(40)+'\n\n';
   d.fields.filter(function(f){ return f.v; }).forEach(function(f){ msg += f.l+' : '+f.v+'\n'; });
   msg += '\n'+'\u2500'.repeat(40)+'\nTeam Garantie GEA \u2013 VW';
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: WEB3_KEY,
-      subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
-      message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(res){
-    if (!res.success) throw new Error('web3forms error');
-    var newD2 = {
-      id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
-      date: new Date().toLocaleDateString('fr-FR'),
-      site: d.site, type: d.type, or: gv('or_number'), chassis: gv('chassis'),
-      code_dommage: d.domFull,
-      desig_piece: ge('desig-val')?ge('desig-val').value:'',
-      rubrique: ge('rub-val')?ge('rub-val').value:'',
-      categorie: ge('dom-cat')?ge('dom-cat').value:'',
-      email_usager: email, conseiller_client: gv('conseiller_client'),
-      kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
-      statut: 'En attente', commentaire_team: '', commerce: null
-    };
-    if (demandesRef) {
-    if (demandesRef) return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
-    return _pjK2.then(function(_u2){if(_u2.length)newD2.pieces_jointes=_u2;
-      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
-    }).catch(function(e){console.warn('PJ Kulanz:',e);
-      return demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){return newD2;});
-    });}
-    G.demandes.unshift(newD2); return newD2;
-  })
-  .then(function(newD2){
+  // 1) Construire l'enregistrement (sauvegarde prioritaire, independante de l'e-mail)
+  var newD2 = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,5),
+    date: new Date().toLocaleDateString('fr-FR'),
+    site: d.site, type: d.type, or: gv('or_number'), chassis: gv('chassis'),
+    code_dommage: d.domFull,
+    desig_piece: ge('desig-val')?ge('desig-val').value:'',
+    rubrique: ge('rub-val')?ge('rub-val').value:'',
+    categorie: ge('dom-cat')?ge('dom-cat').value:'',
+    email_usager: email, conseiller_client: gv('conseiller_client'),
+    kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
+    statut: 'En attente', commentaire_team: '', commerce: null
+  };
+  // Conserver TOUS les champs du formulaire (plainte, emplacement, reponses KULANZ, codes separes...)
+  (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in newD2)) newD2[k]=snap[k]; })(formSnapshot());
+  // Mode modification : reutiliser l'id et la date d'origine
+  if (G.editingId) { var _o2=getDemandeById(G.editingId); if(_o2){ newD2.id=_o2.id; newD2.date=_o2.date||newD2.date; } }
+
+  // 2) Enregistrer dans Firebase EN PREMIER (source de verite)
+  var saveP;
+  if (demandesRef) {
+    saveP = demandesRef.child('d'+newD2.id.replace(/[^a-zA-Z0-9]/g,'')).set(newD2).then(function(){ return newD2; });
+  } else {
+    G.demandes.unshift(newD2);
+    saveP = Promise.resolve(newD2);
+  }
+
+  saveP.then(function(rec){
+    // 3) Notification "nouvelle demande" a la TeamGarantie -- en arriere-plan, NON bloquante.
+    //    Si l'envoi echoue (reseau, spam...), la demande reste enregistree.
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          access_key: WEB3_KEY,
+          subject: '['+d.type+'] Nouvelle demande \u2013 '+d.site+' \u2013 OR '+gv('or_number'),
+          message: msg, from_name: gv('conseiller_client')||d.site, replyto: email
+        })
+      }).catch(function(e){ console.warn('Notif TeamGarantie non envoyee:', e); });
+    } catch(e){ console.warn('Notif TeamGarantie:', e); }
+
+    // 4) Nettoyage brouillon + ecran de succes
     try { (function(){ try{ var _lk=localStorage.getItem('gea_draft_last')||'gea_draft';localStorage.removeItem(_lk);localStorage.removeItem('gea_draft_last'); }catch(e){} })(); } catch(e) {}
+    G.editingId = null;
     ge('success-details').innerHTML =
-      '<strong>Site\u00a0:</strong> '+esc(newD2.site)+'<br>'+
-      '<strong>Type\u00a0:</strong> '+esc(newD2.type)+'<br>'+
-      '<strong>N\u00b0 OR\u00a0:</strong> '+esc(newD2.or)+'<br>'+
-      '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(newD2.chassis)+'<br>'+
-      '<strong>E-mail\u00a0:</strong> '+esc(newD2.email_usager);
-    ge('success-overlay').classList.add('open');
+      '<strong>Site\u00a0:</strong> '+esc(rec.site)+'<br>'+
+      '<strong>Type\u00a0:</strong> '+esc(rec.type)+'<br>'+
+      '<strong>N\u00b0 OR\u00a0:</strong> '+esc(rec.or)+'<br>'+
+      '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(rec.chassis);
+    G._dirty = false; ge('success-overlay').classList.add('open');
   })
-  .catch(function(err){ console.error(err); toast('\u274c Erreur \u2013 r\u00e9essayez.'); })
+  .catch(function(err){ console.error(err); toast('\u274c Erreur d\'enregistrement \u2013 reessayez.'); })
   .finally(function(){
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
@@ -1369,6 +1506,12 @@ function envoyerFormulaire() {
 
 function nouvelleDemande() {
   ge('success-overlay').classList.remove('open');
+  G.editingId = null;
+  G.editOnly = false;
+  G._dirty = false;
+  clearReopenBanner();
+  var _bv=ge('btn-envoyer');
+  if(_bv){ var _svg=_bv.querySelector('svg'); _bv.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande'; }
   ge('mainForm').reset();
   ge('f-type').value = 'Kulanz';
   ssReset('dom'); ssReset('ava');
@@ -1461,103 +1604,110 @@ function genererPDF() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // HISTORIQUE
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-// ═══════════════════════════════════════════
-// FONCTIONS HISTORIQUE & FORMULAIRE
-// ═══════════════════════════════════════════
-
-// IQ n° — n'autoriser que les chiffres (max 9)
-function onIqInput(el) {
-  if (!el) return;
-  el.value = el.value.replace(/[^0-9]/g, '').slice(0, 9);
+// Tri de l'historique au clic sur un en-tête (bascule asc/desc)
+function sortHisto(key) {
+  if (G.histoSort.key === key) {
+    G.histoSort.dir = (G.histoSort.dir === 'asc') ? 'desc' : 'asc';
+  } else {
+    G.histoSort.key = key;
+    G.histoSort.dir = (key === 'date') ? 'desc' : 'asc';
+  }
+  renderHisto();
 }
 
-// Onglet historique Kulanz / CCR
+// Export CSV de la liste actuellement affichée (type + filtres + recherche)
+function exportHistoCSV() {
+  var fS  = G.role==='usager' ? G.site : (ge('f-site')?ge('f-site').value:'');
+  var fT  = G.histoType || 'Kulanz';
+  var fSt = ge('f-stat-sel') ? ge('f-stat-sel').value : '';
+  var q   = (ge('f-search') ? ge('f-search').value : '').toLowerCase().trim();
+  var rows = G.demandes.filter(function(d) {
+    if (d.type!==fT) return false;
+    if (fS && d.site!==fS) return false;
+    if (fSt && d.statut!==fSt) return false;
+    if (q) { var hay=((d.chassis||'')+' '+(d.or||'')+' '+(d.conseiller_client||'')+' '+(d.code_dommage||'')).toLowerCase(); if(hay.indexOf(q)===-1) return false; }
+    return true;
+  });
+  if (!rows.length) { toast('Aucune demande à exporter.'); return; }
+  var cols = ['date','site','type','or','chassis','kvps','code_dommage','conseiller_client','email_usager','kilometrage','statut','commentaire_team'];
+  var head = ['Date','Site','Type','N OR','Chassis','KVPS','Code dommage','Conseiller','Email','Kilometrage','Statut','Commentaire'];
+  var esc2 = function(v){ v = String(v==null?'':v).replace(/"/g,'""'); return '"'+v+'"'; };
+  var csv = head.map(esc2).join(';') + '\r\n';
+  rows.forEach(function(d){ csv += cols.map(function(c){ return esc2(d[c]); }).join(';') + '\r\n'; });
+  var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'}); // BOM pour Excel
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'historique_'+fT+'_'+(fS||'tous')+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  toast('✔ Export CSV ('+rows.length+' demande(s)).');
+}
+
+// Indicateur de progression : compte les champs requis remplis (adapté Kulanz/CCR)
+function updateFormProgress() {
+  var bar = ge('form-progress-bar'); if (!bar) return;
+  var isCCR = (ge('f-type') && ge('f-type').value === 'CCR');
+  // Champs requis communs
+  var checks = [
+    !!(ge('f-site') && ge('f-site').value),
+    isValidVIN(gv('chassis')),
+    /^\d{6}$/.test(gv('or_number')),
+    !!gv('plainte_client'),
+    !!(ge('desig-val') && ge('desig-val').value),
+    !!(ge('dom-val') && ge('dom-val').value),
+    !!(ge('ava-val') && ge('ava-val').value),
+    !!gv('conseiller_client'),
+    /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('email_usager'))
+  ];
+  if (isCCR) {
+    checks.push(!!gr('elsa_dispo'));
+    checks.push(/^\d{9}$/.test(gv('iq_num')));
+    checks.push(!!(ge('chk-engagement') && ge('chk-engagement').checked));
+  }
+  var done = checks.filter(Boolean).length;
+  var total = checks.length;
+  var pct = total ? Math.round(done/total*100) : 0;
+  bar.style.width = pct + '%';
+  bar.style.background = (pct===100) ? 'var(--green,#0B7A6E)' : 'var(--accent)';
+  var lbl = ge('form-progress-label'); if (lbl) lbl.textContent = 'Champs requis : ' + done + ' / ' + total;
+  var pc  = ge('form-progress-pct');   if (pc)  pc.textContent = pct + ' %';
+}
+
 function setHistoType(type) {
   G.histoType = type;
   var k = ge('htab-kulanz'), c = ge('htab-ccr');
-  if (k && c) {
-    var on = function(b){ b.style.background='var(--accent)'; b.style.color='#fff'; b.classList.add('active'); };
-    var off= function(b){ b.style.background='var(--card)'; b.style.color='var(--ink)'; b.classList.remove('active'); };
-    if (type==='Kulanz') { on(k); off(c); } else { on(c); off(k); }
+  if (k) { var aK = (type==='Kulanz');
+    k.style.background = aK ? 'var(--accent)' : 'var(--card)';
+    k.style.color      = aK ? '#fff' : 'var(--ink)';
+    k.classList.toggle('active', aK);
+  }
+  if (c) { var aC = (type==='CCR');
+    c.style.background = aC ? 'var(--accent)' : 'var(--card)';
+    c.style.color      = aC ? '#fff' : 'var(--ink)';
+    c.classList.toggle('active', aC);
   }
   renderHisto();
-}
-
-// Tri de l'historique
-function sortHisto(key) {
-  if (G.histoSort.key === key) {
-    G.histoSort.asc = !G.histoSort.asc;
-  } else {
-    G.histoSort.key = key;
-    G.histoSort.asc = true;
-  }
-  // Indicateurs visuels
-  ['date','site','or','statut'].forEach(function(k){
-    var s = ge('sort-'+k);
-    if (s) s.textContent = (k===key) ? (G.histoSort.asc?'▲':'▼') : '';
-  });
-  renderHisto();
-}
-
-// Garantie OPTEVEN visible dans ELSA — afficher/masquer un message si besoin
-function onElsaChange() {
-  // Hook léger : recalcule l'état KULANZ NOK si la fonction existe
-  if (typeof checkKulanzNok === 'function') {
-    try { checkKulanzNok(); } catch(e) {}
-  }
-}
-
-// Export CSV de l'historique
-function exportHistoCSV() {
-  var rows = (G.demandes || []).filter(function(d){
-    return !G.histoType || d.type === G.histoType;
-  });
-  if (!rows.length) { toast('Aucune demande à exporter.'); return; }
-  var cols = ['date','site','type','or','chassis','code_dommage','statut','conseiller_client','email_usager'];
-  var head = ['Date','Site','Type','N° OR','Châssis','Code dommage','Statut','Conseiller','Email'];
-  var csv = head.join(';') + '\n';
-  rows.forEach(function(d){
-    csv += cols.map(function(c){
-      var v = (d[c]==null?'':String(d[c])).replace(/"/g,'""');
-      return /[;"\n]/.test(v) ? '"'+v+'"' : v;
-    }).join(';') + '\n';
-  });
-  try {
-    var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'historique_'+(G.histoType||'demandes')+'_'+new Date().toISOString().slice(0,10)+'.csv';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-    toast('✔ Export CSV téléchargé.');
-  } catch(e) {
-    console.warn('Export CSV:', e);
-    toast('❌ Erreur export CSV.');
-  }
-}
-
-// Changer mon mot de passe (Firebase reset email)
-function changerMonMdp() {
-  var cu = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
-  if (!cu || !cu.email) { toast('Connectez-vous d\'abord.'); return; }
-  if (!confirm('Envoyer un e-mail de réinitialisation du mot de passe à '+cu.email+' ?')) return;
-  firebase.auth().sendPasswordResetEmail(cu.email)
-    .then(function(){ toast('✔ E-mail de réinitialisation envoyé à '+cu.email); })
-    .catch(function(e){ console.warn('Reset mdp:', e); toast('❌ '+(e && e.message ? e.message : 'Erreur envoi e-mail.')); });
 }
 
 function renderHisto() {
   // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
   var fS  = G.role==='usager' ? G.site : ge('f-site').value;
-  var fT  = ge('f-type-sel')  ? ge('f-type-sel').value  : '';
+  var fT  = G.histoType || 'Kulanz';   // onglet actif Kulanz / CCR
   var fSt = ge('f-stat-sel')  ? ge('f-stat-sel').value  : '';
+  var mode = G.histoMode || 'pending';
+  // Un dossier est "à traiter" si En attente ou Complément requis ; sinon "traité"
+  var isPending = function(d){ return !statutEstTraite(d.statut); };
+  var inMode = function(d){ return mode==='pending' ? isPending(d) : !isPending(d); };
 
-  var scope = fS
-    ? G.demandes.filter(function(d) { return d.site===fS; })
-    : G.demandes;
+  // Titre + colonne d'action selon le mode
+  var titleEl = ge('histo-title');
+  if (titleEl) titleEl.textContent = (mode==='pending') ? 'Demandes à traiter' : 'Historique (demandes traitées)';
+
+  // Stats calculées sur le type actif (+ site, + mode)
+  var scope = G.demandes.filter(function(d) {
+    return d.type===fT && (!fS || d.site===fS) && inMode(d);
+  });
 
   var el = function(id,val) { var e=ge(id); if(e) e.textContent=val; };
   el('s-total', scope.length);
@@ -1565,44 +1715,58 @@ function renderHisto() {
   el('s-ok',    scope.filter(function(d){return d.statut==='Traitée';}).length);
   el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
+  // Compteurs sur les onglets Kulanz/CCR (selon le mode courant)
+  var siteScope = G.demandes.filter(function(d){ return (!fS || d.site===fS) && inMode(d); });
+  var cntK = siteScope.filter(function(d){ return d.type==='Kulanz'; }).length;
+  var cntC = siteScope.filter(function(d){ return d.type==='CCR'; }).length;
+  var ck1 = ge('htab-kulanz-cnt'); if (ck1) ck1.textContent = cntK ? '('+cntK+')' : '';
+  var cc1 = ge('htab-ccr-cnt');    if (cc1) cc1.textContent = cntC ? '('+cntC+')' : '';
+
+  // Badge sur l'onglet "Demandes" : total en attente (tous types, site filtré)
+  var pendingTotal = G.demandes.filter(function(d){ return (!fS||d.site===fS) && isPending(d); }).length;
+  var tdc = ge('tab-demandes-cnt'); if (tdc) tdc.textContent = pendingTotal ? '('+pendingTotal+')' : '';
+
+  // Recherche texte (châssis, OR, conseiller, code dommage)
+  var q = (ge('f-search') ? ge('f-search').value : '').toLowerCase().trim();
+
   var filtered = G.demandes.filter(function(d) {
-    var typeOk = (!fT || d.type===fT) && (!G.histoType || d.type===G.histoType);
-    return (!fS||d.site===fS) && typeOk && (!fSt||d.statut===fSt);
+    if (d.type!==fT) return false;
+    if (!inMode(d)) return false;
+    if (fS && d.site!==fS) return false;
+    if (fSt && d.statut!==fSt) return false;
+    if (q) {
+      var hay = ((d.chassis||'')+' '+(d.or||'')+' '+(d.conseiller_client||'')+' '+(d.code_dommage||'')).toLowerCase();
+      if (hay.indexOf(q)===-1) return false;
+    }
+    return true;
   });
+
   // Tri
-  var sk = G.histoSort ? G.histoSort.key : 'date';
-  var asc = G.histoSort ? G.histoSort.asc : false;
+  var sk = G.histoSort.key, sdir = (G.histoSort.dir==='asc'?1:-1);
   filtered.sort(function(a,b){
     var va, vb;
-    if (sk==='date') { va=String(a.id); vb=String(b.id); }
-    else { va=String(a[sk]||'').toLowerCase(); vb=String(b[sk]||'').toLowerCase(); }
-    if (va<vb) return asc?-1:1;
-    if (va>vb) return asc?1:-1;
-    return 0;
+    if (sk==='or')      { va=parseInt(a.or)||0; vb=parseInt(b.or)||0; }
+    else if (sk==='date'){ va=String(a.id); vb=String(b.id); } // id = timestamp, tri fiable
+    else                { va=String(a[sk]||'').toLowerCase(); vb=String(b[sk]||'').toLowerCase(); }
+    if (va<vb) return -1*sdir; if (va>vb) return 1*sdir; return 0;
   });
-  // Compteurs onglets
-  var cntK = G.demandes.filter(function(d){return d.type==='Kulanz'&&(!fS||d.site===fS);}).length;
-  var cntC = G.demandes.filter(function(d){return d.type==='CCR'&&(!fS||d.site===fS);}).length;
-  var eK=ge('htab-kulanz-cnt'); if(eK) eK.textContent='('+cntK+')';
-  var eC=ge('htab-ccr-cnt'); if(eC) eC.textContent='('+cntC+')';
-  // Bouton export visible pour team
-  var _bx=ge('btn-export-csv'); if(_bx) _bx.style.display=(G.role==='team'?'':'none');
+  // Indicateurs de tri dans les en-têtes
+  ['date','site','or','statut'].forEach(function(k){
+    var s=ge('sort-'+k); if(s) s.textContent = (sk===k) ? (G.histoSort.dir==='asc'?'▲':'▼') : '';
+  });
 
   var _bv=ge('btn-vider-histo'); if(_bv) _bv.style.display=(G.role==='team'?'':'none');
+  var _ex=ge('btn-export-csv');  if(_ex) _ex.style.display=(G.role==='team'?'':'none');
   var tbody = ge('histo-body');
   var empty = ge('histo-empty');
   if (!tbody) return;
   if (!filtered.length) { tbody.innerHTML=''; if(empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
 
-  var BADGE = {
-    'En attente':'b-wait','Traitée':'b-ok','Traitée sans participation':'b-no','Complément requis':'b-comp'
-  };
-  var ICON = {'En attente':'🟡','Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄'};
-
   tbody.innerHTML = filtered.map(function(d) {
-    var bc   = BADGE[d.statut] || 'b-wait';
-    var ic   = ICON[d.statut]  || '🟡';
+    var _si  = statutInfo(d.statut);
+    var bc   = _si.badge;
+    var ic   = _si.icon;
     var pec  = '—';
     if (d.statut==='Traitée' && d.commerce) {
       var c=d.commerce, pts=[];
@@ -1612,10 +1776,16 @@ function renderHisto() {
       if(c.pe_de)  pts.push('<span>Pièces ext.: '+esc(c.pe_de)+'%</span>');
       if(pts.length) pec='<div style="font-size:11px;line-height:1.7">'+pts.join('')+'</div>';
     }
+    var _traitee = statutEstTraite(d.statut);
+    var _btnLabel = _traitee ? '✓ Validée'
+      : (d.statut === 'Complément requis' ? 'À compléter' : 'Valider');
+    var _btnStyle = _traitee
+      ? 'background:var(--green,#0B7A6E);'
+      : (d.statut === 'Complément requis' ? 'background:var(--amber,#B26A00);' : '');
     var action = G.role==='team'
-      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" onclick="openSPFromBtn(this)">Valider</button>'
-      : '—';
-    return '<tr>'+
+      ? '<button class="btn-val" data-id="'+esc(String(d.id))+'" style="'+_btnStyle+'" onclick="event.stopPropagation();openSPFromBtn(this)">'+_btnLabel+'</button>'
+      : '<span style="font-size:11px;color:var(--accent-d);font-weight:600">Ouvrir ›</span>';
+    return '<tr style="cursor:pointer" onclick="histoRowClick(\''+esc(String(d.id))+'\')" title="Cliquer pour ouvrir">'+
       '<td>'+esc(d.date||'')+'</td>'+
       '<td style="font-weight:500">'+esc(d.site||'')+'</td>'+
       '<td><span style="font-size:11px;font-weight:600;color:var(--gold)">'+esc(d.type||'')+'</span></td>'+
@@ -1751,11 +1921,12 @@ function dashClick(el) {
   [].forEach.call(document.querySelectorAll('.s-btn'), function(b) {
     b.classList.toggle('active', b.textContent.trim() === newSite);
   });
-  // Basculer sur l'historique
+  // Basculer sur la file "Demandes à traiter" (mode pending)
   [].forEach.call(document.querySelectorAll('.page'), function(p) { p.classList.remove('active'); });
   [].forEach.call(document.querySelectorAll('.nav-tab'), function(t) { t.classList.remove('active'); });
+  G.histoMode = 'pending';
   ge('page-histo').classList.add('active');
-  ge('tab-histo').classList.add('active');
+  if (ge('tab-demandes')) ge('tab-demandes').classList.add('active');
   ge('type-bar').style.display = 'none';
   renderHisto();
   renderDash();
@@ -1769,6 +1940,115 @@ function openSPFromBtn(btn) {
   openSP(id);
 }
 
+// Clic sur une ligne d'historique :
+//  - mode "à traiter" + TeamGarantie -> ouvre directement la fenêtre de validation
+//  - sinon -> rouvre la demande (consultation / édition / duplication)
+function histoRowClick(id) {
+  if (G.histoMode === 'pending' && G.role === 'team') {
+    if (confirm('Voulez-vous modifier cette demande ?\n\nOK     → ouvrir le formulaire pour corriger et enregistrer (sans envoi de mail)\nAnnuler → ne rien faire')) {
+      G.editOnly = true;       // édition seule : enregistre sans envoyer de mail
+      openDemande(id);
+    }
+  } else {
+    G.editOnly = false;
+    openDemande(id);
+  }
+}
+
+// Retrouve une demande par id (compare en chaîne)
+function getDemandeById(id) {
+  for (var i = 0; i < G.demandes.length; i++) {
+    if (String(G.demandes[i].id) === String(id)) return G.demandes[i];
+  }
+  return null;
+}
+
+// Rouvre une demande depuis l'historique dans le formulaire.
+//  - "En attente" / "Complément requis" -> édition : l'envoi MET À JOUR la même demande.
+//  - "Traitée" / "Traitée sans participation" -> pré-rempli : l'envoi crée une NOUVELLE demande (duplication).
+function openDemande(id) {
+  var d = getDemandeById(id);
+  if (!d) { toast('⚠ Demande introuvable.'); return; }
+
+  var statut = d.statut || 'En attente';
+  var estFinalisee = statutEstTraite(statut);
+
+  // Remettre le formulaire à zéro puis le repeupler
+  if (ge('mainForm')) ge('mainForm').reset();
+  G.editingId = null;
+  resetCat();
+  ssReset('dom'); ssReset('ava'); ssReset('rub'); ssResetDesig();
+  setType(d.type === 'CCR' ? 'C' : 'K');
+
+  fillFormFromRecord(d);
+
+  // Mode : duplication (finalisée) ou modification (en cours)
+  // En mode "editOnly" (clic ligne TeamGarantie), on force la modification de CETTE demande.
+  G.editingId = (G.editOnly || !estFinalisee) ? String(id) : null;
+
+  // Aller sur l'onglet formulaire
+  showPage('form', ge('tab-form'));
+
+  // Bandeau d'information en haut du formulaire
+  showReopenBanner(G.editOnly ? false : estFinalisee, d);
+
+  // Mettre à jour le libellé du bouton d'envoi
+  var bv = ge('btn-envoyer');
+  if (bv) {
+    var lbl = G.editOnly ? 'Enregistrer les modifications'
+            : (estFinalisee ? 'Créer une nouvelle demande' : 'Mettre à jour la demande');
+    var svg = bv.querySelector('svg');
+    bv.innerHTML = (svg ? svg.outerHTML : '') + ' ' + lbl;
+  }
+
+  toast(G.editOnly ? '✏ Modification — enregistrez sans envoi de mail.'
+        : (estFinalisee ? '📄 Demande dupliquée — ajustez puis envoyez.' : '✏ Demande rouverte en modification.'));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Affiche/actualise un bandeau au-dessus du formulaire
+function showReopenBanner(estFinalisee, d) {
+  var host = ge('mainForm');
+  if (!host) return;
+  var old = ge('reopen-banner'); if (old) old.remove();
+  var div = document.createElement('div');
+  div.id = 'reopen-banner';
+  if (estFinalisee) {
+    div.className = 'info-box';
+    div.style.cssText = 'background:var(--info-soft);border:1px solid var(--info-line);color:var(--info);margin-bottom:14px';
+    div.innerHTML = '📄 <strong>Duplication</strong> — basée sur la demande '
+      + esc(d.type||'') + ' du ' + esc(d.date||'') + ' (' + esc(d.statut||'') + '). '
+      + 'À l\'envoi, une <strong>nouvelle demande</strong> sera créée. '
+      + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--info);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+  } else {
+    div.className = 'info-box';
+    div.style.cssText = 'background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px';
+    if (G.editOnly) {
+      div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
+        + ' (' + esc(d.statut||'') + '). En enregistrant, cette demande sera <strong>mise à jour sans envoi de mail</strong>. '
+        + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+    } else {
+      div.innerHTML = '✏ <strong>Modification</strong> — demande ' + esc(d.type||'') + ' du ' + esc(d.date||'')
+        + ' (' + esc(d.statut||'') + '). À l\'envoi, cette demande sera <strong>mise à jour</strong>. '
+        + '<button type="button" onclick="annulerReouverture()" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:12px;padding:0;margin-left:6px">Annuler</button>';
+    }
+  }
+  host.insertBefore(div, host.firstChild);
+}
+
+function clearReopenBanner() {
+  var b = ge('reopen-banner'); if (b) b.remove();
+}
+
+// Annule la réouverture : repart sur un formulaire vierge
+function annulerReouverture() {
+  G.editingId = null;
+  G.editOnly = false;
+  clearReopenBanner();
+  if (typeof nouvelleDemande === 'function') nouvelleDemande();
+  toast('Réouverture annulée.');
+}
+
 function openSP(id) {
   G.activeId = id;
   var d = G.demandes.find(function(x) { return x.id == id; });
@@ -1780,14 +2060,46 @@ function openSP(id) {
   setText('sp-type',    d.type);
   setText('sp-or',      d.or);
   setText('sp-chassis', d.chassis);
+  setText('sp-km',      d.kilometrage ? d.kilometrage+' km' : '');
   setText('sp-dom',     d.code_dommage);
+  setText('sp-ava',     (d.ava_code ? d.ava_code + (d.ava_lbl ? ' — '+d.ava_lbl : '') : ''));
   setText('sp-date',    d.date);
+
+  // Vérifications KULANZ (réponses du demandeur) — uniquement pour les demandes Kulanz
+  var ksec = ge('sp-kulanz-sec');
+  var klist = ge('sp-kulanz-list');
+  if (ksec && klist) {
+    if (d.type === 'Kulanz') {
+      var brandK = SITE_BRAND[d.site] || 'VW';
+      var qs = KULANZ_BY_BRAND[brandK] || KULANZ_BY_BRAND['VW'];
+      var rows = '';
+      qs.forEach(function(q) {
+        var val = d['k_'+q.name];
+        if (val === undefined || val === null || val === '') return; // non répondu : on saute
+        // Couleur : rouge si réponse NOK, vert sinon
+        var isNok = (q.nok && val === q.nok);
+        var color = isNok ? 'var(--red,#c0392b)' : 'var(--green,#0B7A6E)';
+        rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid var(--line,#eee)">'
+              + '<span style="color:#555">' + esc(q.label) + '</span>'
+              + '<strong style="color:'+color+';white-space:nowrap">' + esc(val) + '</strong></div>';
+        if (q.name === 'tpi' && val === 'OUI' && d.num_tpi) {
+          rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid var(--line,#eee)">'
+                + '<span style="color:#555">N° TPI</span><strong>' + esc(d.num_tpi) + '</strong></div>';
+        }
+      });
+      if (d.num_tpi && rows.indexOf('N° TPI')===-1) {
+        rows += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0"><span style="color:#555">N° TPI</span><strong>'+esc(d.num_tpi)+'</strong></div>';
+      }
+      klist.innerHTML = rows || '<span style="color:#999">Aucune réponse enregistrée.</span>';
+      ksec.style.display = 'block';
+    } else {
+      ksec.style.display = 'none';
+    }
+  }
   var stat = ge('sp-statut');
   if (stat) stat.value = d.statut || 'En attente';
   var cmt = ge('sp-comment');
   if (cmt) cmt.value = d.commentaire_team || '';
-  var pwd = ge('sp-pwd');
-  if (pwd) pwd.value = '';
   var err = ge('sp-pwd-err');
   if (err) err.style.display = 'none';
   var c = d.commerce || {};
@@ -1798,12 +2110,10 @@ function openSP(id) {
   if (ext) ext.value = c.type_ext || '';
   var okBtn = ge('sp-ok-btn');
   if (okBtn) okBtn.disabled = false;
-  var _ev=ge('sp-info-view'),_ee=ge('sp-info-edit'),_eb=ge('sp-edit-btn');
-  if(_ev)_ev.style.display='grid'; if(_ee)_ee.style.display='none'; if(_eb)_eb.textContent='✏️ Modifier';
   onStatutChange();
   var spOv = ge('sp-overlay'); if(spOv) spOv.classList.add('open');
   var spPn = ge('side-panel'); if(spPn) spPn.classList.add('open');
-  setTimeout(function() { var p=ge('sp-pwd'); if(p) p.focus(); }, 350);
+  setTimeout(function() { var c=ge('sp-statut'); if(c) c.focus(); }, 350);
 }
 
 function closeSP() {
@@ -1817,63 +2127,6 @@ function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
   if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
-}
-
-
-// ═══ MODIFICATION DEMANDE (avant validation) ═══
-function toggleEditSP() {
-  var view = ge('sp-info-view'), edit = ge('sp-info-edit'), btn = ge('sp-edit-btn');
-  if (!view || !edit) return;
-  var editing = edit.style.display !== 'none';
-  if (editing) {
-    edit.style.display='none'; view.style.display='grid';
-    if(btn) btn.textContent='✏️ Modifier';
-  } else {
-    var cu=(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth().currentUser:null;
-    if(!cu||!isTeamEmail(cu.email)){ toast('❌ Réservé à la TeamGarantie.'); return; }
-    var d=G.demandes.find(function(x){return x.id==G.activeId;});
-    if(!d) return;
-    if(ge('sp-edit-or')) ge('sp-edit-or').value=d.or||'';
-    if(ge('sp-edit-chassis')) ge('sp-edit-chassis').value=d.chassis||'';
-    if(ge('sp-edit-km')) ge('sp-edit-km').value=d.kilometrage||'';
-    if(ge('sp-edit-conseiller')) ge('sp-edit-conseiller').value=d.conseiller_client||'';
-    if(ge('sp-edit-email')) ge('sp-edit-email').value=d.email_usager||'';
-    if(ge('sp-edit-dom')) ge('sp-edit-dom').value=d.code_dommage||'';
-    view.style.display='none'; edit.style.display='flex';
-    if(btn) btn.textContent='✕ Fermer';
-  }
-}
-
-function saveEditSP() {
-  var cu=(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth().currentUser:null;
-  if(!cu||!isTeamEmail(cu.email)){ toast('❌ Session expirée.'); return; }
-  var d=G.demandes.find(function(x){return x.id==G.activeId;});
-  if(!d){ toast('❌ Demande introuvable.'); return; }
-  var update={
-    or: ge('sp-edit-or')?ge('sp-edit-or').value.trim():d.or,
-    chassis: ge('sp-edit-chassis')?ge('sp-edit-chassis').value.trim().toUpperCase():d.chassis,
-    kilometrage: ge('sp-edit-km')?ge('sp-edit-km').value.trim():d.kilometrage,
-    conseiller_client: ge('sp-edit-conseiller')?ge('sp-edit-conseiller').value.trim():d.conseiller_client,
-    email_usager: ge('sp-edit-email')?ge('sp-edit-email').value.trim():d.email_usager,
-    code_dommage: ge('sp-edit-dom')?ge('sp-edit-dom').value.trim():d.code_dommage
-  };
-  var doSave=function(){
-    if(demandesRef){
-      var key='d'+String(d.id).replace(/[^a-zA-Z0-9]/g,'');
-      return demandesRef.child(key).update(update);
-    } else {
-      var idx=G.demandes.findIndex(function(x){return x.id==G.activeId;});
-      if(idx!==-1) Object.assign(G.demandes[idx],update);
-      return Promise.resolve();
-    }
-  };
-  doSave().then(function(){
-    Object.assign(d,update);
-    var st=function(id,v){var e=ge(id);if(e)e.textContent=v||'—';};
-    st('sp-or',d.or); st('sp-chassis',d.chassis); st('sp-km',d.kilometrage); st('sp-dom',d.code_dommage);
-    toggleEditSP(); renderHisto();
-    toast('✔ Demande modifiée.');
-  }).catch(function(e){ console.warn('Modif:',e); toast('❌ Erreur modification.'); });
 }
 
 function validerSP() {
@@ -1958,8 +2211,9 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var corps=sep+'\n';
   corps+='🔧  DEMANDE KULANZ — '+(d.site||'').toUpperCase()+'\n';
   corps+=sep+'\n\n';
+  corps+='A: '+(d.email_usager||d.email||'—')+'  |  CC: teamgarantie@geauto.fr\n\n';
   corps+='📋  IDENTIFICATION\n'+sep2+'\n';
-  corps+='  N° OR          : '+(d.or_number||'—')+'\n';
+  corps+='  N° OR          : '+(d.or||d.or_number||'—')+'\n';
   corps+='  Date OR        : '+(d.date_or||'—')+'\n';
   corps+='  Châssis        : '+(d.chassis||'—')+'\n';
   corps+='  Kilométrage    : '+(d.kilometrage||'—')+' km\n';
@@ -1967,11 +2221,11 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   corps+='  Conseiller     : '+(d.conseiller_client||'—')+'\n';
   corps+='  E-mail         : '+(d.email_usager||'—')+'\n\n';
   corps+='🔩  DOMMAGE\n'+sep2+'\n';
-  corps+='  Catégorie      : '+(d.categorie||'—')+'\n';
-  corps+='  Rubrique       : '+(d.rubrique||'—')+'\n';
-  corps+='  Désignation    : '+(d.designation||'—')+'\n';
-  corps+='  Code dommage   : '+(d.code_dom||'—')+'\n';
-  corps+='  Code avarie    : '+(d.code_ava||'—')+'\n';
+  corps+='  Catégorie      : '+(d.categorie||d.dom_cat||'—')+'\n';
+  corps+='  Rubrique       : '+(d.rubrique||d.dom_rub||'—')+'\n';
+  corps+='  Désignation    : '+(d.desig_piece||'—')+'\n';
+  corps+='  Code dommage   : '+(d.code_dommage||d.dom_code||'—')+'\n';
+  corps+='  Code avarie    : '+((d.ava_code?d.ava_code+(d.ava_lbl?' — '+d.ava_lbl:''):'')||'—')+'\n';
   if(d.plainte_client) corps+='  Plainte client : '+d.plainte_client+'\n';
   corps+='\n'+statIcon+'  STATUT : '+statut.toUpperCase()+'\n'+sep2+'\n';
   if(commentaire) corps+='  Commentaire    : '+commentaire+'\n';
@@ -1989,54 +2243,21 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   // Ouvrir Outlook avec l'email pré-rempli
   var dest = d.email_usager || d.email || '';
   if (!dest) dest = 'teamgarantie@geauto.fr';
-  var corpsEnc = encodeURIComponent(corps.substring(0, 1500));
+  var corpsEnc = encodeURIComponent(corps.substring(0, 1800));
   var sujetEnc = encodeURIComponent(sujet);
-  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + '&body=' + corpsEnc;
+  // teamgarantie@geauto.fr en copie (sauf s'il est déjà le destinataire)
+  var ccPart = (dest.toLowerCase() !== 'teamgarantie@geauto.fr') ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
+  var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + ccPart + '&body=' + corpsEnc;
 
   window.location.href = mailto;
   toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
 }
 
 
-function sendStatusMail(d, statut, commentaire, commerce) {
-  var icons = {'Traitée':'✅','Traitée sans participation':'❌','Complément requis':'🔄','En attente':'🟡'};
-  var ic = icons[statut] || '🔔';
-  var sep = Array(41).join('-');
-  var pecMsg = '';
-  if (statut==='Traitée' && commerce) {
-    pecMsg = '\n\nPrise en charge accordée :\n';
-    if(commerce.mo_de)  pecMsg += '- Main d oeuvre : '+commerce.mo_de+'%\n';
-    if(commerce.pi_de)  pecMsg += '- Pieces        : '+commerce.pi_de+'%\n';
-    if(commerce.moe_de) pecMsg += '- MO ext.       : '+commerce.moe_de+'%\n';
-    if(commerce.pe_de)  pecMsg += '- Pieces ext.   : '+commerce.pe_de+'%\n';
-    if(commerce.type_ext) pecMsg += '- Type ext.     : '+commerce.type_ext+'\n';
-  }
-  var body = 'Bonjour'+(d.conseiller_client?' '+d.conseiller_client:'')+',\n\n'
-    +'Votre demande '+d.type+' a ete traitee.\n\n'
-    +sep+'\nStatut : '+ic+' '+statut
-    +'\nSite : '+d.site
-    +'\nN OR : '+d.or
-    +'\nChassis : '+d.chassis
-    +(commentaire?'\nCommentaire : '+commentaire:'')
-    +pecMsg+'\n'+sep+'\n\n'
-    +(statut==='Traitée'?'Vous pouvez proceder a la saisie dans SAGA/2.\n'
-     :statut==='Traitée sans participation'?'Veuillez contacter la TeamGarantie.\n'
-     :'Un complement de dossier est necessaire.\n')
-    +'\nCordialement,\nTeam Garantie GEA - VW';
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: WEB3_KEY,
-      subject: ic+' Demande '+d.type+' '+statut+' - OR '+d.or,
-      message: body,
-      from_name: 'Team Garantie GEA - VW',
-      replyto: 'teamgarantie@geauto.fr'
-    })
-  })
-  .then(function() { toast('Email envoye.'); })
-  .catch(function() { toast('Statut OK mais email non envoye.'); });
-}
+// Notification de statut aux usagers : SUPPRIMÉE volontairement.
+// Aucune notification automatique n'est envoyée aux usagers (création ou validation).
+// Seule la TeamGarantie est notifiée des nouvelles demandes (Web3Forms / mailto).
+
 
 
 
@@ -2090,6 +2311,9 @@ function selectCat(btn) {
   if (hint) { hint.textContent = '✔ ' + cat; hint.className = 'hint ok'; }
   // Reset toute la cascade sous catégorie
   resetBelow('cat');
+  // Réévaluer les critères entretien (bloquants pour Moto/Transmission) + bandeau
+  updateEntretienBanner();
+  checkKulanzNok();
   toast('✔ ' + cat);
 }
 
@@ -2122,6 +2346,8 @@ function catManualConfirm() {
   [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){ b.classList.remove('active'); });
   var manBtn = document.querySelector('.cat-btn.manual'); if(manBtn) manBtn.classList.add('active');
   resetCascadeBelow('cat');
+  updateEntretienBanner();
+  checkKulanzNok();
   toast('✔ Catégorie "'+cat+'" définie');
 }
 
@@ -2303,6 +2529,11 @@ function renderKulanzForm(site) {
   if (title) title.textContent = 'V\u00e9rifications KULANZ \u2014 ' + brand;
 
   var html = '';
+  // Bandeau entretien : MASQUÉ par défaut, affiché uniquement pour Motopropulseur / Transmission
+  html += '<div id="entretien-banner" class="info-box" style="display:none;background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);margin-bottom:14px;font-weight:600">'
+    + '\u26a0\ufe0f Sous r\u00e9serve que l\'entretien soit \u00e0 jour.'
+    + '<span style="font-weight:400"><br>Cat\u00e9gorie soumise \u00e0 l\'entretien : les pr\u00e9conisations constructeur, le dernier entretien et l\'absence de lien dommage/entretien sont des crit\u00e8res <strong>bloquants</strong> pour cette demande.</span>'
+    + '</div>';
   questions.forEach(function(q, idx) {
 
     // ── TPI ──
@@ -2373,6 +2604,7 @@ function renderKulanzForm(site) {
   });
 
   zone.innerHTML = html;
+  updateEntretienBanner();
 
   var alertZone = ge('kulanz-nok-alert');
   if (alertZone) { alertZone.classList.remove('show'); alertZone.innerHTML = ''; }
@@ -2404,6 +2636,19 @@ var BRAND_TEXTS = {
   }
 };
 
+// Vrai si la catégorie sélectionnée est soumise au critère entretien (Motopropulseur / Transmission)
+function isEntretienCategory() {
+  var cat = ge('dom-cat') ? (ge('dom-cat').value || '') : '';
+  cat = cat.toLowerCase();
+  return cat.indexOf('motopropulseur') !== -1 || cat.indexOf('transmission') !== -1;
+}
+
+// Affiche le bandeau entretien uniquement pour Motopropulseur / Transmission
+function updateEntretienBanner() {
+  var banner = ge('entretien-banner');
+  if (banner) banner.style.display = isEntretienCategory() ? 'block' : 'none';
+}
+
 function checkKulanzNok() {
   var zone = ge('kulanz-nok-alert');
   if (!zone) return;
@@ -2412,10 +2657,16 @@ function checkKulanzNok() {
   var brand  = SITE_BRAND[site] || 'VW';
   var questions = KULANZ_BY_BRAND[brand] || KULANZ_BY_BRAND['VW'];
 
+  // Les critères liés à l'entretien ne sont BLOQUANTS que pour Motopropulseur / Transmission
+  var entretienNames = ['preconisations','dernier_entretien','dernier_entretien_audi','entretien_moment','lien_entretien'];
+  var catEntretien = isEntretienCategory();
+
   // Collecter les réponses et détecter les NOK
   var reasons = [];
   questions.forEach(function(q) {
     if (!q.nok) return;
+    // Si la question est liée à l'entretien et que la catégorie n'est pas Moto/Transmission, on ne bloque pas dessus
+    if (entretienNames.indexOf(q.name) !== -1 && !catEntretien) return;
     var val = gr(q.name);
     if (q.nok && val === q.nok && val !== 'NC') {
       reasons.push(q.info || q.label);
@@ -2566,3 +2817,16 @@ function checkKulanzNok() {
   }
 })();
 
+// ═══════════════════════════════════════════════════════════
+// Avertissement avant fermeture si une demande non envoyée est en cours
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('beforeunload', function(e) {
+  // Seulement si connecté, formulaire modifié, et au moins un champ clé rempli
+  if (!G.role || !G._dirty) return;
+  var rempli = (typeof gv === 'function') &&
+    (gv('chassis') || gv('or_number') || gv('plainte_client'));
+  if (!rempli) return;
+  e.preventDefault();
+  e.returnValue = ''; // message standardisé par le navigateur
+  return '';
+});
