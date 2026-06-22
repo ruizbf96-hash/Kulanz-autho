@@ -103,7 +103,9 @@ var G = {
   activeId: null,  // demande en cours de validation
   kulanzData: {}, // copie kulanz pour CCR
   fbListening: false,
-  demandeType: 'K' // K = Kulanz, C = CCR
+  demandeType: 'K', // K = Kulanz, C = CCR
+  histoType: 'Kulanz', // filtre onglet historique
+  histoSort: { key: 'date', asc: false }
 };
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1459,6 +1461,94 @@ function genererPDF() {
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // HISTORIQUE
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+// ═══════════════════════════════════════════
+// FONCTIONS HISTORIQUE & FORMULAIRE
+// ═══════════════════════════════════════════
+
+// IQ n° — n'autoriser que les chiffres (max 9)
+function onIqInput(el) {
+  if (!el) return;
+  el.value = el.value.replace(/[^0-9]/g, '').slice(0, 9);
+}
+
+// Onglet historique Kulanz / CCR
+function setHistoType(type) {
+  G.histoType = type;
+  var k = ge('htab-kulanz'), c = ge('htab-ccr');
+  if (k && c) {
+    var on = function(b){ b.style.background='var(--accent)'; b.style.color='#fff'; b.classList.add('active'); };
+    var off= function(b){ b.style.background='var(--card)'; b.style.color='var(--ink)'; b.classList.remove('active'); };
+    if (type==='Kulanz') { on(k); off(c); } else { on(c); off(k); }
+  }
+  renderHisto();
+}
+
+// Tri de l'historique
+function sortHisto(key) {
+  if (G.histoSort.key === key) {
+    G.histoSort.asc = !G.histoSort.asc;
+  } else {
+    G.histoSort.key = key;
+    G.histoSort.asc = true;
+  }
+  // Indicateurs visuels
+  ['date','site','or','statut'].forEach(function(k){
+    var s = ge('sort-'+k);
+    if (s) s.textContent = (k===key) ? (G.histoSort.asc?'▲':'▼') : '';
+  });
+  renderHisto();
+}
+
+// Garantie OPTEVEN visible dans ELSA — afficher/masquer un message si besoin
+function onElsaChange() {
+  // Hook léger : recalcule l'état KULANZ NOK si la fonction existe
+  if (typeof checkKulanzNok === 'function') {
+    try { checkKulanzNok(); } catch(e) {}
+  }
+}
+
+// Export CSV de l'historique
+function exportHistoCSV() {
+  var rows = (G.demandes || []).filter(function(d){
+    return !G.histoType || d.type === G.histoType;
+  });
+  if (!rows.length) { toast('Aucune demande à exporter.'); return; }
+  var cols = ['date','site','type','or','chassis','code_dommage','statut','conseiller_client','email_usager'];
+  var head = ['Date','Site','Type','N° OR','Châssis','Code dommage','Statut','Conseiller','Email'];
+  var csv = head.join(';') + '\n';
+  rows.forEach(function(d){
+    csv += cols.map(function(c){
+      var v = (d[c]==null?'':String(d[c])).replace(/"/g,'""');
+      return /[;"\n]/.test(v) ? '"'+v+'"' : v;
+    }).join(';') + '\n';
+  });
+  try {
+    var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'historique_'+(G.histoType||'demandes')+'_'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    toast('✔ Export CSV téléchargé.');
+  } catch(e) {
+    console.warn('Export CSV:', e);
+    toast('❌ Erreur export CSV.');
+  }
+}
+
+// Changer mon mot de passe (Firebase reset email)
+function changerMonMdp() {
+  var cu = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!cu || !cu.email) { toast('Connectez-vous d\'abord.'); return; }
+  if (!confirm('Envoyer un e-mail de réinitialisation du mot de passe à '+cu.email+' ?')) return;
+  firebase.auth().sendPasswordResetEmail(cu.email)
+    .then(function(){ toast('✔ E-mail de réinitialisation envoyé à '+cu.email); })
+    .catch(function(e){ console.warn('Reset mdp:', e); toast('❌ '+(e && e.message ? e.message : 'Erreur envoi e-mail.')); });
+}
+
 function renderHisto() {
   // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
   var fS  = G.role==='usager' ? G.site : ge('f-site').value;
@@ -1476,8 +1566,27 @@ function renderHisto() {
   el('s-no',    scope.filter(function(d){return d.statut==='Traitée sans participation';}).length);
 
   var filtered = G.demandes.filter(function(d) {
-    return (!fS||d.site===fS) && (!fT||d.type===fT) && (!fSt||d.statut===fSt);
+    var typeOk = (!fT || d.type===fT) && (!G.histoType || d.type===G.histoType);
+    return (!fS||d.site===fS) && typeOk && (!fSt||d.statut===fSt);
   });
+  // Tri
+  var sk = G.histoSort ? G.histoSort.key : 'date';
+  var asc = G.histoSort ? G.histoSort.asc : false;
+  filtered.sort(function(a,b){
+    var va, vb;
+    if (sk==='date') { va=String(a.id); vb=String(b.id); }
+    else { va=String(a[sk]||'').toLowerCase(); vb=String(b[sk]||'').toLowerCase(); }
+    if (va<vb) return asc?-1:1;
+    if (va>vb) return asc?1:-1;
+    return 0;
+  });
+  // Compteurs onglets
+  var cntK = G.demandes.filter(function(d){return d.type==='Kulanz'&&(!fS||d.site===fS);}).length;
+  var cntC = G.demandes.filter(function(d){return d.type==='CCR'&&(!fS||d.site===fS);}).length;
+  var eK=ge('htab-kulanz-cnt'); if(eK) eK.textContent='('+cntK+')';
+  var eC=ge('htab-ccr-cnt'); if(eC) eC.textContent='('+cntC+')';
+  // Bouton export visible pour team
+  var _bx=ge('btn-export-csv'); if(_bx) _bx.style.display=(G.role==='team'?'':'none');
 
   var _bv=ge('btn-vider-histo'); if(_bv) _bv.style.display=(G.role==='team'?'':'none');
   var tbody = ge('histo-body');
@@ -1689,6 +1798,8 @@ function openSP(id) {
   if (ext) ext.value = c.type_ext || '';
   var okBtn = ge('sp-ok-btn');
   if (okBtn) okBtn.disabled = false;
+  var _ev=ge('sp-info-view'),_ee=ge('sp-info-edit'),_eb=ge('sp-edit-btn');
+  if(_ev)_ev.style.display='grid'; if(_ee)_ee.style.display='none'; if(_eb)_eb.textContent='✏️ Modifier';
   onStatutChange();
   var spOv = ge('sp-overlay'); if(spOv) spOv.classList.add('open');
   var spPn = ge('side-panel'); if(spPn) spPn.classList.add('open');
@@ -1706,6 +1817,63 @@ function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
   if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
+}
+
+
+// ═══ MODIFICATION DEMANDE (avant validation) ═══
+function toggleEditSP() {
+  var view = ge('sp-info-view'), edit = ge('sp-info-edit'), btn = ge('sp-edit-btn');
+  if (!view || !edit) return;
+  var editing = edit.style.display !== 'none';
+  if (editing) {
+    edit.style.display='none'; view.style.display='grid';
+    if(btn) btn.textContent='✏️ Modifier';
+  } else {
+    var cu=(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth().currentUser:null;
+    if(!cu||!isTeamEmail(cu.email)){ toast('❌ Réservé à la TeamGarantie.'); return; }
+    var d=G.demandes.find(function(x){return x.id==G.activeId;});
+    if(!d) return;
+    if(ge('sp-edit-or')) ge('sp-edit-or').value=d.or||'';
+    if(ge('sp-edit-chassis')) ge('sp-edit-chassis').value=d.chassis||'';
+    if(ge('sp-edit-km')) ge('sp-edit-km').value=d.kilometrage||'';
+    if(ge('sp-edit-conseiller')) ge('sp-edit-conseiller').value=d.conseiller_client||'';
+    if(ge('sp-edit-email')) ge('sp-edit-email').value=d.email_usager||'';
+    if(ge('sp-edit-dom')) ge('sp-edit-dom').value=d.code_dommage||'';
+    view.style.display='none'; edit.style.display='flex';
+    if(btn) btn.textContent='✕ Fermer';
+  }
+}
+
+function saveEditSP() {
+  var cu=(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth().currentUser:null;
+  if(!cu||!isTeamEmail(cu.email)){ toast('❌ Session expirée.'); return; }
+  var d=G.demandes.find(function(x){return x.id==G.activeId;});
+  if(!d){ toast('❌ Demande introuvable.'); return; }
+  var update={
+    or: ge('sp-edit-or')?ge('sp-edit-or').value.trim():d.or,
+    chassis: ge('sp-edit-chassis')?ge('sp-edit-chassis').value.trim().toUpperCase():d.chassis,
+    kilometrage: ge('sp-edit-km')?ge('sp-edit-km').value.trim():d.kilometrage,
+    conseiller_client: ge('sp-edit-conseiller')?ge('sp-edit-conseiller').value.trim():d.conseiller_client,
+    email_usager: ge('sp-edit-email')?ge('sp-edit-email').value.trim():d.email_usager,
+    code_dommage: ge('sp-edit-dom')?ge('sp-edit-dom').value.trim():d.code_dommage
+  };
+  var doSave=function(){
+    if(demandesRef){
+      var key='d'+String(d.id).replace(/[^a-zA-Z0-9]/g,'');
+      return demandesRef.child(key).update(update);
+    } else {
+      var idx=G.demandes.findIndex(function(x){return x.id==G.activeId;});
+      if(idx!==-1) Object.assign(G.demandes[idx],update);
+      return Promise.resolve();
+    }
+  };
+  doSave().then(function(){
+    Object.assign(d,update);
+    var st=function(id,v){var e=ge(id);if(e)e.textContent=v||'—';};
+    st('sp-or',d.or); st('sp-chassis',d.chassis); st('sp-km',d.kilometrage); st('sp-dom',d.code_dommage);
+    toggleEditSP(); renderHisto();
+    toast('✔ Demande modifiée.');
+  }).catch(function(e){ console.warn('Modif:',e); toast('❌ Erreur modification.'); });
 }
 
 function validerSP() {
