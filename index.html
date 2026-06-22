@@ -628,8 +628,11 @@
   </div>
   <div class="sp-body">
     <div class="sp-sec">
-      <div class="sp-sec-title">Informations</div>
-      <div class="sp-info-grid">
+      <div class="sp-sec-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Informations</span>
+        <button type="button" id="sp-edit-btn" onclick="toggleEditSP()" style="background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:11px;padding:3px 10px;cursor:pointer;font-weight:700">✏️ Modifier</button>
+      </div>
+      <div id="sp-info-view" class="sp-info-grid">
         <div class="sp-info"><div class="sp-info-l">Site</div><div class="sp-info-v" id="sp-site">—</div></div>
         <div class="sp-info"><div class="sp-info-l">Type</div><div class="sp-info-v" id="sp-type">—</div></div>
         <div class="sp-info"><div class="sp-info-l">N° OR</div><div class="sp-info-v" id="sp-or">—</div></div>
@@ -638,6 +641,18 @@
         <div class="sp-info"><div class="sp-info-l">Code dommage</div><div class="sp-info-v" id="sp-dom" style="font-size:11px">—</div></div>
         <div class="sp-info"><div class="sp-info-l">Code avarie</div><div class="sp-info-v" id="sp-ava" style="font-size:11px">—</div></div>
         <div class="sp-info"><div class="sp-info-l">Date</div><div class="sp-info-v" id="sp-date">—</div></div>
+      </div>
+      <div id="sp-info-edit" style="display:none;flex-direction:column;gap:8px">
+        <div class="field"><label>N° OR</label><input type="text" id="sp-edit-or"></div>
+        <div class="field"><label>Châssis</label><input type="text" id="sp-edit-chassis"></div>
+        <div class="field"><label>Kilométrage</label><input type="text" id="sp-edit-km"></div>
+        <div class="field"><label>Conseiller client</label><input type="text" id="sp-edit-conseiller"></div>
+        <div class="field"><label>E-mail usager</label><input type="text" id="sp-edit-email"></div>
+        <div class="field"><label>Code dommage</label><input type="text" id="sp-edit-dom"></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button type="button" onclick="saveEditSP()" style="flex:1;background:var(--accent);color:#fff;border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">💾 Enregistrer</button>
+          <button type="button" onclick="toggleEditSP()" style="background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:9px 14px;font-size:13px;cursor:pointer">Annuler</button>
+        </div>
       </div>
     </div>
     <div class="sp-sec" id="sp-kulanz-sec" style="display:none">
