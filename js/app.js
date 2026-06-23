@@ -155,8 +155,11 @@ function initFirebase() {
     db = firebase.database();
     demandesRef = db.ref('demandes');
     db.ref('.info/connected').on('value', function(snap) {
+      var connected = !!snap.val();
       var dot = ge('db-dot');
-      if (dot) dot.style.background = snap.val() ? '#27ae60' : '#e74c3c';
+      if (dot) dot.style.background = connected ? '#27ae60' : '#e74c3c';
+      // N'afficher le bandeau hors-ligne qu'après une vraie perte (pas au tout premier chargement)
+      if (connected) setOffline(false);
     });
     return true;
   } catch(e) {
@@ -174,16 +177,34 @@ function startListener() {
     snap.forEach(function(c) { G.demandes.push(c.val()); });
     G.demandes.sort(function(a,b) { return String(b.id) > String(a.id) ? 1 : -1; });
     try { localStorage.setItem('gea_demandes', JSON.stringify(G.demandes)); } catch(e) {}
+    setOffline(false); // lecture OK → en ligne
     renderHisto();
     if (G.role === 'team') renderDash();
   }, function(err) {
     console.warn('Firebase offline:', err);
+    setOffline(true); // lecture impossible → bandeau hors ligne
     try {
       var s = localStorage.getItem('gea_demandes');
       G.demandes = s ? JSON.parse(s) : [];
     } catch(e) { G.demandes = []; }
     renderHisto();
   });
+}
+
+// Affiche/masque le bandeau "Mode hors ligne"
+function setOffline(isOffline) {
+  var bn = ge('offline-banner');
+  if (bn) bn.style.display = isOffline ? 'block' : 'none';
+}
+
+// Tentative de reconnexion (relance l'écoute Firebase)
+function reconnecterFirebase() {
+  toast('Reconnexion en cours…');
+  try {
+    G.fbListening = false;
+    if (!db || !demandesRef) initFirebase();
+    startListener();
+  } catch(e) { console.warn('Reconnexion:', e); }
 }
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -396,6 +417,7 @@ function changerMonMdp() {
 
 function deconnecter() {
   deconnecterUsager();
+  if (typeof setOffline === 'function') setOffline(false);
   G.role = ''; G.site = ''; G.fbListening = false;
   var mh2 = ge('main-header') || document.querySelector('header');
   if (mh2) mh2.style.display = 'none';
@@ -447,10 +469,17 @@ function selectSite(btn, name) {
   if (btn) btn.classList.add('active');
   var fsite = ge('f-site'); if(fsite) fsite.value = name;
   var hn = ge('h-site-name'); if(hn) hn.textContent = name || 'Tous les sites';
-  // Remplir KVPS si usager (readOnly = usager, writable = team)
+  // Remplir le champ Site visible du formulaire
+  var sd = ge('site-display'); if (sd) sd.value = name || '';
+  // Remplir le KVPS automatiquement à partir du site (pour TeamGarantie comme pour l'usager)
   var kvpsEl2 = ge('kvps');
-  if (kvpsEl2 && !kvpsEl2.readOnly) kvpsEl2.value = KVPS_MAP[name] || '';
+  if (kvpsEl2) kvpsEl2.value = name ? (KVPS_MAP[name] || '') : '';
+  var kvpsName = document.querySelector('[name="kvps"]');
+  if (kvpsName && kvpsName !== kvpsEl2) kvpsName.value = name ? (KVPS_MAP[name] || '') : '';
+  // Afficher le champ Site s'il était masqué
+  var sf = ge('site-field'); if (sf) sf.style.display = 'flex';
   renderKulanzForm(name);
+  if (typeof updateFormProgress === 'function') updateFormProgress();
 }
 
 function setType(t) {
