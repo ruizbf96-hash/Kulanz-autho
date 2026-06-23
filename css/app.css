@@ -123,7 +123,9 @@ input,select,textarea{font-family:inherit}
 header{
   background:#fff;border-bottom:1px solid var(--line);
   position:sticky;top:0;z-index:100;box-shadow:var(--shadow);
+  transition:transform .25s ease;
 }
+header.header-hidden{transform:translateY(-100%)}
 .h-top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 26px;height:58px;flex-wrap:wrap}
 .h-logo{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.2px;white-space:nowrap}
 .h-logo span{color:var(--accent)}
