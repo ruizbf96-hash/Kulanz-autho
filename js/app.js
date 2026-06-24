@@ -523,6 +523,33 @@ var ssState = { dom: null, ava: null, desig: null, rub: null };
 
 function ssData(key) {
   if (key === 'ava') return CODES_AVA;
+
+  // Recherche unifiée "pièce ou code" : chaque entrée = une paire rubrique|désignation,
+  // avec son code, sa rubrique et sa catégorie déduite, pour tout remplir d'un coup.
+  if (key === 'piece') {
+    if (window.__pieceIndex) return window.__pieceIndex;
+    var idx = [];
+    var rubToCat = {};
+    Object.keys(CAT_RUBS).forEach(function(c){ CAT_RUBS[c].forEach(function(r){ rubToCat[r] = c; }); });
+    Object.keys(RUB_LABEL_CODES).forEach(function(k){
+      var parts = k.split('|||');
+      var rub = parts[0], desig = parts[1];
+      var codes = RUB_LABEL_CODES[k] || [];
+      var cat = rubToCat[rub] || '';
+      // code = le 1er code ; label affiché = désignation + contexte rubrique
+      var code = codes.length ? codes[0] : '';
+      idx.push({
+        code: code || desig,        // ce qui s'affiche en gras à gauche
+        label: desig,               // libellé principal
+        _desig: desig, _rub: rub, _cat: cat, _codes: codes,
+        // texte de recherche : désignation + rubrique + tous les codes
+        _search: (desig + ' ' + rub + ' ' + codes.join(' ')).toLowerCase()
+      });
+    });
+    window.__pieceIndex = idx;
+    return idx;
+  }
+
   var cat    = ge('dom-cat')   ? ge('dom-cat').value   : '';
   var rubVal = ge('rub-val')   ? ge('rub-val').value   : '';
   var desigV = ge('desig-val') ? ge('desig-val').value : '';
@@ -614,9 +641,26 @@ function ssClear(key) {
     rub:   'Rechercher une rubrique…',
     desig: 'Rechercher une désignation…',
     dom:   'Rechercher par code ou libéllé…',
-    ava:   'Sélectionner un code avarie…'
+    ava:   'Sélectionner un code avarie…',
+    piece: 'Tapez le nom de la pièce ou le code…'
   };
   if (txt) txt.textContent = ph[key] || 'Sélectionner…';
+  // Effacer la recherche unifiée réinitialise tout le bloc dommage
+  if (key === 'piece') {
+    var ci=ge('dom-cat'); if(ci) ci.value='';
+    [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){ b.classList.remove('active'); });
+    var ch=ge('cat-hint'); if(ch){ch.textContent='';ch.className='hint';}
+    ['rub','desig','dom'].forEach(function(k){
+      ssState[k]=null;
+      var v=ge(k+'-val'); if(v) v.value='';
+      var l=ge(k+'-lbl'); if(l) l.value='';
+      var b=ge('ss-'+k+'-btn'); if(b){ b.classList.remove('filled'); var t=b.querySelector('.ss-txt'); if(t) t.textContent=ph[k]||'Sélectionner…'; }
+      var h=ge('ss-'+k+'-hint'); if(h){h.textContent='';h.className='hint';}
+    });
+    var ph2=ge('ss-piece-hint'); if(ph2){ph2.textContent='Choisissez la pièce : la catégorie, la rubrique et le code se remplissent automatiquement.';ph2.className='hint';}
+    if (typeof updatePieceRecap==='function') updatePieceRecap();
+    ssClose(); saveDraft(); return;
+  }
   // Propager le reset vers le bas
   if (key === 'rub') {
     var rv = ge('rub-val'); if (rv) rv.value = '';
@@ -667,7 +711,7 @@ function ssToggle(key) {
 
 
 function ssClose() {
-  ['dom','ava','desig','rub'].forEach(function(k) {
+  ['dom','ava','desig','rub','piece'].forEach(function(k) {
     var d = ge('ss-'+k+'-drop');
     var b = ge('ss-'+k+'-btn');
     if (d) d.classList.remove('open');
@@ -696,6 +740,8 @@ function ssRender(key, query) {
   var filtered;
   if (!q) {
     filtered = items;
+  } else if (key === 'piece') {
+    filtered = items.filter(function(it){ return it._search.indexOf(q) !== -1; });
   } else if (key === 'dom' || key === 'ava') {
     // Code: commence par | label: contient
     filtered = items.filter(function(it) {
@@ -715,6 +761,20 @@ function ssRender(key, query) {
   if (!opts) return;
   if (!shown.length) { opts.innerHTML = '<div class="ss-empty">Aucun résultat</div>'; return; }
   var cur = ssState[key] ? ssState[key].code : '';
+
+  if (key === 'piece') {
+    opts.innerHTML = shown.map(function(it, i) {
+      var realIdx = items.indexOf(it);
+      var codeTxt = (it._codes && it._codes.length) ? it._codes.join(' / ') : '—';
+      return '<div class="ss-opt" data-pieceidx="' + realIdx + '" onclick="piecePickFromEl(this)">'
+        + '<span class="ss-code" style="font-size:13px;font-weight:700">' + esc(codeTxt) + '</span>'
+        + '<span class="ss-lbl" style="margin-left:8px">' + esc(it._desig) + '</span>'
+        + '<span class="ss-lbl" style="color:#999;font-size:11px;margin-left:8px">(' + esc(it._rub) + ')</span>'
+        + '</div>';
+    }).join('');
+    return;
+  }
+
   opts.innerHTML = shown.map(function(it) {
     var sel = (it.code === cur) ? ' sel' : '';
     var display;
@@ -731,6 +791,103 @@ function ssRender(key, query) {
          + '" data-label="' + esc(it.label) + '" data-key="' + key
          + '" onclick="ssPickFromEl(this)">' + display + '</div>';
   }).join('');
+}
+
+// === RECHERCHE UNIFIÉE "pièce ou code" ===
+// Sélection depuis la liste : remplit catégorie + rubrique + désignation + code dommage d'un coup.
+function piecePickFromEl(el) {
+  var idx = parseInt(el.getAttribute('data-pieceidx'), 10);
+  var items = ssData('piece');
+  var it = items[idx];
+  if (!it) return;
+  piecePick(it);
+}
+
+function piecePick(it) {
+  // Catégorie
+  var ci = ge('dom-cat'); if (ci) ci.value = it._cat || '';
+  [].forEach.call(document.querySelectorAll('.cat-btn'), function(b){
+    b.classList.toggle('active', b.getAttribute('data-cat') === it._cat);
+  });
+  var ch = ge('cat-hint'); if (ch && it._cat) { ch.textContent = '✔ ' + it._cat; ch.className = 'hint ok'; }
+
+  // Rubrique
+  var rv = ge('rub-val'); if (rv) rv.value = it._rub || '';
+  ssState['rub'] = { code: it._rub, label: it._rub };
+  var rb = ge('ss-rub-btn'); if (rb) { rb.classList.add('filled'); var rt = rb.querySelector('.ss-txt'); if (rt) rt.textContent = it._rub; }
+  var rh = ge('ss-rub-hint'); if (rh) { rh.textContent = '✔ ' + it._rub; rh.className = 'hint ok'; }
+
+  // Désignation
+  var dv = ge('desig-val'); if (dv) dv.value = it._desig || '';
+  ssState['desig'] = { code: it._desig, label: it._desig };
+  var dbt = ge('ss-desig-btn'); if (dbt) { dbt.classList.add('filled'); var dt = dbt.querySelector('.ss-txt'); if (dt) dt.textContent = it._desig; }
+  var dh = ge('ss-desig-hint'); if (dh) { dh.textContent = '✔ ' + it._desig; dh.className = 'hint ok'; }
+
+  // Code dommage : s'il y en a un seul -> auto ; sinon on prend le 1er mais on ouvre le mode avancé pour choisir
+  var codes = it._codes || [];
+  if (codes.length) {
+    ssPick('dom', codes[0], it._desig);
+  }
+
+  // Champ unique : afficher la sélection + récap
+  ssState['piece'] = { code: it._desig, label: it._desig };
+  var pbtn = ge('ss-piece-btn'); if (pbtn) { pbtn.classList.add('filled'); var pt = pbtn.querySelector('.ss-txt'); if (pt) pt.textContent = (codes[0] ? codes[0] + ' — ' : '') + it._desig; }
+  var pe = ge('ss-piece'); var pve = ge('ss-piece-btn'); if (pve) pve.classList.remove('field-error');
+  var ph = ge('ss-piece-hint'); if (ph) { ph.textContent = codes.length > 1 ? ('Plusieurs codes possibles ('+codes.join(', ')+') — vérifiez en mode détaillé.') : '✔ Pièce et code sélectionnés'; ph.className = 'hint ok'; }
+
+  updatePieceRecap();
+  ssClose();
+  saveDraft();
+  if (typeof updateEntretienBanner === 'function') updateEntretienBanner();
+  if (typeof checkKulanzNok === 'function') checkKulanzNok();
+}
+
+// Saisie manuelle d'une pièce hors liste
+function piecemanualConfirm() {
+  var inp = ge('ss-piece-manual');
+  if (!inp || !inp.value.trim()) { toast('Saisissez une désignation.'); return; }
+  var raw = inp.value.trim();
+  var dv = ge('desig-val'); if (dv) { dv.value = raw; dv.dataset.manual = 'true'; }
+  ssState['desig'] = { code: raw, label: raw };
+  var dbt = ge('ss-desig-btn'); if (dbt) { dbt.classList.add('filled'); var dt = dbt.querySelector('.ss-txt'); if (dt) dt.textContent = raw; }
+  ssState['piece'] = { code: raw, label: raw };
+  var pbtn = ge('ss-piece-btn'); if (pbtn) { pbtn.classList.add('filled'); var pt = pbtn.querySelector('.ss-txt'); if (pt) pt.textContent = raw; }
+  var ph = ge('ss-piece-hint'); if (ph) { ph.textContent = 'Saisie manuelle — complétez le code dommage en mode détaillé.'; ph.className = 'hint'; }
+  // ouvrir le mode avancé pour saisir le code manuellement
+  ouvrirAvance(true);
+  updatePieceRecap();
+  inp.value = ''; ssClose(); saveDraft();
+  toast('✔ Désignation manuelle : ' + raw);
+}
+
+// Met à jour l'encadré récapitulatif lecture seule
+function updatePieceRecap() {
+  var recap = ge('dommage-recap'); if (!recap) return;
+  var cat = ge('dom-cat') ? ge('dom-cat').value : '';
+  var rub = ge('rub-val') ? ge('rub-val').value : '';
+  var desig = ge('desig-val') ? ge('desig-val').value : '';
+  var dom = ge('dom-val') ? ge('dom-val').value : '';
+  if (cat || rub || desig || dom) {
+    recap.style.display = 'block';
+    var sc=ge('recap-cat'), sr=ge('recap-rub'), sd=ge('recap-desig'), sdo=ge('recap-dom');
+    if(sc) sc.textContent = cat || '—';
+    if(sr) sr.textContent = rub || '—';
+    if(sd) sd.textContent = desig || '—';
+    if(sdo) sdo.textContent = dom || '—';
+  } else {
+    recap.style.display = 'none';
+  }
+}
+
+// Affiche/masque le mode détaillé (champs catégorie/rubrique/désignation/code)
+function ouvrirAvance(show) {
+  [].forEach.call(document.querySelectorAll('.avance-field'), function(el){ el.style.display = show ? '' : 'none'; });
+  var b = ge('btn-avance');
+  if (b) b.textContent = (show ? '▾' : '▸') + ' Mode détaillé (catégorie → rubrique → désignation, ou saisie manuelle)';
+}
+function toggleAvance() {
+  var anyVisible = [].some.call(document.querySelectorAll('.avance-field'), function(el){ return el.style.display !== 'none'; });
+  ouvrirAvance(!anyVisible);
 }
 
 function ssPick(key, code, label) {
@@ -798,6 +955,7 @@ function ssPick(key, code, label) {
   }
   ssClose();
   saveDraft();
+  if (typeof updatePieceRecap === 'function') updatePieceRecap();
 }
 
 function fillCascadeFromCode(code, desigLabel) {
@@ -1269,8 +1427,8 @@ function envoyerFormulaire() {
   if (!isValidVIN(gv('chassis'))) mark('chassis', 'Châssis invalide (17 caractères, sans I/O/Q)', 'chassis');
   if (!/^\d{6}$/.test(gv('or_number'))) mark('or-num', 'N° OR : 6 chiffres requis', 'or-num');
   if (!gv('plainte_client')) mark('plainte_client', 'Plainte client obligatoire', 'plainte_client');
-  if (!ge('desig-val') || !ge('desig-val').value) mark('desig-val', 'Sélectionnez une désignation pièce', 'ss-desig-btn');
-  if (!ge('dom-val') || !ge('dom-val').value) mark('dom-val', 'Sélectionnez un code dommage', 'ss-dom-btn');
+  if (!ge('desig-val') || !ge('desig-val').value) mark('ss-piece-btn', 'Choisissez une pièce ou un code dommage', 'ss-piece-btn');
+  if (!ge('dom-val') || !ge('dom-val').value) mark('ss-piece-btn', 'Code dommage manquant — choisissez une pièce ou saisissez le code en mode détaillé', 'ss-piece-btn');
   if (!ge('ava-val') || !ge('ava-val').value) mark('ava-val', 'Sélectionnez un code avarie', 'ss-ava-btn');
   if (!gv('conseiller_client')) mark('conseiller_client', 'Nom du demandeur obligatoire', 'conseiller_client');
   var email = gv('email_usager');
