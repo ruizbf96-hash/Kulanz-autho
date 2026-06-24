@@ -308,9 +308,46 @@
             <textarea name="plainte_client" placeholder="LE CLIENT SIGNALE …" oninput="saveDraft()"></textarea>
           </div>
 
-          <!-- Catégorie -->
+          <!-- RECHERCHE UNIQUE pièce ou code dommage (parcours simplifié) -->
           <div class="field col2">
-            <label>Catégorie <span class="req">*</span></label>
+            <label>Pièce ou code dommage <span class="req">*</span></label>
+            <div class="ss-wrap" id="ss-piece">
+              <button type="button" class="ss-btn" id="ss-piece-btn" onclick="ssToggle('piece')">
+                <span class="ss-txt" id="ss-piece-txt">🔍 Tapez le nom de la pièce ou le code…</span>
+                <span class="ss-arr">▼</span>
+              </button>
+              <div class="ss-drop" id="ss-piece-drop">
+                <div class="ss-search-row"><span>🔍</span><input class="ss-inp" id="ss-piece-inp" placeholder="Ex : pompe à eau, calculateur, 9193…" oninput="ssFilter('piece',this.value)"></div>
+                <div class="ss-meta"><span id="ss-piece-cnt"></span><button class="ss-clr" onclick="ssClear('piece')">✕ Effacer</button></div>
+                <div class="ss-opts" id="ss-piece-opts"></div>
+                <div class="ss-manual-row">
+                  <span>✏ Saisie manuelle :</span>
+                  <input class="ss-manual-inp" id="ss-piece-manual" placeholder="Désignation libre…">
+                  <button class="ss-manual-ok" onclick="piecemanualConfirm()">OK</button>
+                </div>
+              </div>
+            </div>
+            <span class="hint" id="ss-piece-hint">Choisissez la pièce : la catégorie, la rubrique et le code se remplissent automatiquement.</span>
+          </div>
+
+          <!-- Récapitulatif lecture seule (rempli automatiquement après choix de la pièce) -->
+          <div class="field col2" id="dommage-recap" style="display:none">
+            <div style="background:var(--accent-soft,#E4F3F4);border:1px solid var(--accent-line,#A9DCE0);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.8">
+              <div><strong>Catégorie :</strong> <span id="recap-cat">—</span></div>
+              <div><strong>Rubrique :</strong> <span id="recap-rub">—</span></div>
+              <div><strong>Désignation :</strong> <span id="recap-desig">—</span></div>
+              <div><strong>Code dommage :</strong> <span id="recap-dom" style="font-weight:700;color:var(--accent-d,#0A7280)">—</span></div>
+            </div>
+          </div>
+
+          <!-- Mode avancé : champs détaillés (catégorie/rubrique/désignation/code) repliables -->
+          <div class="field col2">
+            <button type="button" onclick="toggleAvance()" id="btn-avance" style="background:none;border:none;color:var(--accent-d,#0A7280);font-size:12px;text-decoration:underline;cursor:pointer;padding:0">▸ Mode détaillé (catégorie → rubrique → désignation, ou saisie manuelle)</button>
+          </div>
+
+          <!-- Catégorie -->
+          <div class="field col2 avance-field" style="display:none">
+            <label>Catégorie</label>
             <input type="hidden" id="dom-cat" name="categorie_dommage">
             <div class="cat-btns" id="cat-btns">
               <button type="button" class="cat-btn" data-cat="Ensemble motopropulseur" onclick="selectCat(this)">⚙ Motopropulseur</button>
@@ -331,7 +368,7 @@
 
           <!-- Rubrique : étape de la cascade Catégorie → Rubrique → Désignation → Code -->
           <input type="hidden" id="rub-val" name="rubrique_dommage">
-          <div class="field col2" id="rub-field">
+          <div class="field col2 avance-field" id="rub-field" style="display:none">
             <label>Rubrique</label>
             <div class="ss-wrap" id="ss-rub">
               <button type="button" class="ss-btn" id="ss-rub-btn" onclick="ssToggle('rub')">
@@ -353,8 +390,8 @@
           </div>
 
           <!-- Désignation pièce -->
-          <div class="field">
-            <label>Désignation pièce <span class="req">*</span></label>
+          <div class="field avance-field" style="display:none">
+            <label>Désignation pièce</label>
             <div class="ss-wrap" id="ss-desig">
               <input type="hidden" id="desig-val" name="desig_piece">
               <button type="button" class="ss-btn" id="ss-desig-btn" onclick="ssToggle('desig')">
@@ -376,8 +413,8 @@
           </div>
 
           <!-- Code dommage -->
-          <div class="field">
-            <label>Code dommage <span class="req">*</span></label>
+          <div class="field avance-field" style="display:none">
+            <label>Code dommage</label>
             <div class="ss-wrap" id="ss-dom">
               <input type="hidden" id="dom-val" name="code_dommage">
               <input type="hidden" id="dom-lbl" name="code_dommage_label">
