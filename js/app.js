@@ -2389,32 +2389,16 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
 
   // Sujet : Demande Kulanz_VIN_KVPS
   var kvps = d.kvps || KVPS_MAP[d.site] || '';
-  var sujet = 'Demande Kulanz_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
+  var sujet = 'Demande ' + (d.type || 'Kulanz') + '_' + (d.chassis || '') + (kvps ? '_' + kvps : '');
 
   // Corps du mail
   var sep='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
   var sep2='─────────────────────────────────────────────────────';
   var statIcon=statut==='Traitée'?'✅':statut==='Traitée sans participation'?'❌':statut==='Complément requis'?'🔄':'🟡';
   var corps=sep+'\n';
-  corps+='🔧  DEMANDE KULANZ — '+(d.site||'').toUpperCase()+'\n';
+  corps+='🔧  DEMANDE '+((d.type||'KULANZ').toUpperCase())+' — '+(d.site||'').toUpperCase()+'\n';
   corps+=sep+'\n\n';
-  corps+='A: '+(d.email_usager||d.email||'—')+'  |  CC: teamgarantie@geauto.fr\n\n';
-  corps+='📋  IDENTIFICATION\n'+sep2+'\n';
-  corps+='  N° OR          : '+(d.or||d.or_number||'—')+'\n';
-  corps+='  Date OR        : '+(d.date_or||'—')+'\n';
-  corps+='  Châssis        : '+(d.chassis||'—')+'\n';
-  corps+='  Kilométrage    : '+(d.kilometrage||'—')+' km\n';
-  corps+='  KVPS           : '+(kvps||'—')+'\n';
-  corps+='  Conseiller     : '+(d.conseiller_client||'—')+'\n';
-  corps+='  E-mail         : '+(d.email_usager||'—')+'\n\n';
-  corps+='🔩  DOMMAGE\n'+sep2+'\n';
-  corps+='  Catégorie      : '+(d.categorie||d.dom_cat||'—')+'\n';
-  corps+='  Rubrique       : '+(d.rubrique||d.dom_rub||'—')+'\n';
-  corps+='  Désignation    : '+(d.desig_piece||'—')+'\n';
-  corps+='  Code dommage   : '+(d.code_dommage||d.dom_code||'—')+'\n';
-  corps+='  Code avarie    : '+((d.ava_code?d.ava_code+(d.ava_lbl?' — '+d.ava_lbl:''):'')||'—')+'\n';
-  if(d.plainte_client) corps+='  Plainte client : '+d.plainte_client+'\n';
-  corps+='\n'+statIcon+'  STATUT : '+statut.toUpperCase()+'\n'+sep2+'\n';
+  corps+=statIcon+'  STATUT : '+statut.toUpperCase()+'\n'+sep2+'\n';
   if(commentaire) corps+='  Commentaire    : '+commentaire+'\n';
   if(statut==='Traitée'&&commerce){
     corps+='\n💶  PARTICIPATION COMMERCIALE\n'+sep2+'\n';
