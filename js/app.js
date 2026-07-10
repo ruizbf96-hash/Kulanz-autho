@@ -51,7 +51,7 @@ var SITE_BRAND = {
 var KULANZ_BY_BRAND = {
   'VW': [
     {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
-    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:'OUI', info:'Une garantie OPTEVEN est visible dans ELSA : la prise en charge OPTEVEN prime, la KULANZ ne peut pas être appliquée.'},
     {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
     {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
     {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
@@ -62,7 +62,7 @@ var KULANZ_BY_BRAND = {
   ],
   'Audi': [
     {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
-    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:'OUI', info:'Une garantie OPTEVEN est visible dans ELSA : la prise en charge OPTEVEN prime, la KULANZ ne peut pas être appliquée.'},
     {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
     {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
     {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
@@ -73,7 +73,7 @@ var KULANZ_BY_BRAND = {
   ],
   'SEAT': [
     {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
-    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:'OUI', info:'Une garantie OPTEVEN est visible dans ELSA : la prise en charge OPTEVEN prime, la KULANZ ne peut pas être appliquée.'},
     {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
     {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
     {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
@@ -84,7 +84,7 @@ var KULANZ_BY_BRAND = {
   ],
   'SKODA': [
     {name:'tpi',             label:"Y a-t-il une TPI ?",                                              nok:null, info:"TPI manquante"},
-    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:null},
+    {name:'opteven',         label:"Garantie OPTEVEN visible dans ELSA ?",                            nok:'OUI', info:'Une garantie OPTEVEN est visible dans ELSA : la prise en charge OPTEVEN prime, la KULANZ ne peut pas être appliquée.'},
     {name:'tuning',          label:"Code tuning dans SAGA ?",                                         nok:'OUI', info:"Code tuning détecté → NOK"},
     {name:'piece_usure',     label:"La pièce concernée est une pièce d'usure ?",       nok:'OUI', info:"Pièce d'usure non couverte"},
     {name:'piece_entretien', label:"La pièce concernée est liée à l'entretien ?", nok:null},
@@ -2760,6 +2760,7 @@ function renderKulanzForm(site) {
         + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NON"' + triggerNok + '> Non' + nokNon + '</label>'
         + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NC" onchange="checkKulanzNok()"> Non concerné</label>'
         + '</div>'
+        + '<div class="knok-item" id="knok-item-' + q.name + '" style="display:none;margin-top:8px"></div>'
         + '</div>'
         + divider;
     } else {
@@ -2769,6 +2770,7 @@ function renderKulanzForm(site) {
         + '<label class="r-item"><input type="radio" name="' + q.name + '" value="OUI"' + triggerNok + '> Oui' + nokOui + '</label>'
         + '<label class="r-item"><input type="radio" name="' + q.name + '" value="NON"' + triggerNok + '> Non' + nokNon + '</label>'
         + '</div>'
+        + '<div class="knok-item" id="knok-item-' + q.name + '" style="display:none;margin-top:8px"></div>'
         + '</div>'
         + divider;
     }
@@ -2823,6 +2825,13 @@ function updateEntretienBanner() {
 function checkKulanzNok() {
   var zone = ge('kulanz-nok-alert');
   if (!zone) return;
+
+  // Pop-up immédiat si OPTEVEN passe à OUI (une seule fois par changement)
+  var optevenVal = gr('opteven');
+  if (optevenVal === 'OUI' && G._lastOpteven !== 'OUI') {
+    alert('🚫 Garantie OPTEVEN détectée\n\nUne garantie OPTEVEN est visible dans ELSA.\nLa prise en charge OPTEVEN prime : la KULANZ ne peut pas être appliquée.\n\n→ Orientez le dossier vers la garantie OPTEVEN.');
+  }
+  G._lastOpteven = optevenVal;
 
   var site   = ge('f-site') ? ge('f-site').value : '';
   var brand  = SITE_BRAND[site] || 'VW';
@@ -2879,55 +2888,47 @@ function checkKulanzNok() {
       + '</div>';
   }
 
-  // tuningBlock affiché en tête dans tous les cas si tuning NOK
-  // + texte générique et règles marque toujours présents
-  // Messages contextuels: chaque NOK → son bloc spécifique
-  var _blocks = '';
+  // ── Alertes PAR ITEM : chaque critère écrit son message SOUS sa question ──
+  [].forEach.call(document.querySelectorAll('.knok-item'), function(el){ el.style.display='none'; el.innerHTML=''; });
 
-  // Tuning
-  if (tuningNok) _blocks += tuningBlock;
+  var setItem = function(name, borderColor, titleColor, icon, title, body) {
+    var el = ge('knok-item-' + name);
+    if (!el) return;
+    el.innerHTML = '<div style="background:#fdf0f0;border:2px solid '+borderColor+';border-radius:8px;padding:10px 12px">'
+      + '<div style="font-weight:700;color:'+titleColor+';font-size:12.5px;margin-bottom:4px">'+icon+' '+title+'</div>'
+      + '<p style="margin:0;font-size:12px">'+body+'</p></div>';
+    el.style.display = 'block';
+  };
 
-  // Pièce d'usure
+  if (tuningNok) {
+    setItem('tuning', '#c0392b', '#c0392b', '🚫', 'Code tuning détecté — KULANZ IMPOSSIBLE',
+      'Un <strong>code tuning</strong> est présent dans SAGA. Le constructeur n’accorde aucune participation commerciale sur un véhicule avec code tuning actif.');
+  }
+  if (gr('opteven') === 'OUI') {
+    setItem('opteven', '#c0392b', '#c0392b', '🚫', 'Garantie OPTEVEN détectée — KULANZ IMPOSSIBLE',
+      'Une <strong>garantie OPTEVEN</strong> est visible dans ELSA. La prise en charge OPTEVEN prime : la <strong>KULANZ ne peut pas être appliquée</strong>. Orientez le dossier vers la garantie OPTEVEN.');
+  }
   if (gr('piece_usure') === 'OUI') {
-    _blocks += '<div style="background:#fef9e7;border:2px solid #f39c12;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
-      + '<div style="font-weight:700;color:#d68910;font-size:13px;margin-bottom:5px">⚠️ Pièce d’usure — Non couverte</div>'
-      + '<p style="margin:0;font-size:12px">Les <strong>pièces d’usure</strong> (filtres, plaquettes, balais, ampoules…) sont exclues des participations constructeur. Elles relèvent de l’entretien normal du véhicule.</p>'
-      + '</div>';
+    setItem('piece_usure', '#f39c12', '#d68910', '⚠️', 'Pièce d’usure — Non couverte',
+      'Les <strong>pièces d’usure</strong> (filtres, plaquettes, balais, ampoules…) sont exclues des participations constructeur. Elles relèvent de l’entretien normal du véhicule.');
+  }
+  ['preconisations','dernier_entretien','dernier_entretien_audi'].forEach(function(nm){
+    if (gr(nm) === 'NON' && (entretienNames.indexOf(nm) === -1 || catEntretien)) {
+      setItem(nm, '#e67e22', '#ca6f1e', '📋', 'Entretien incomplet ou non conforme',
+        'Le contrôle de tous les entretiens selon les préconisations constructeur est requis. Une participation reste possible si <strong>aucun lien de causalité</strong> n’existe entre la réclamation et le service manquant. Si un entretien est « à faire », la participation ne peut être proposée qu’après réalisation.');
+    }
+  });
+  if (gr('lien_entretien') === 'OUI' && catEntretien) {
+    setItem('lien_entretien', '#e67e22', '#ca6f1e', '🔗', 'Lien dommage / entretien détecté',
+      'Un lien de causalité établi entre le dommage et l’entretien rend la demande Kulanz <strong>irrecevable</strong>. Le dommage aurait pu être prévenu par un entretien conforme.');
   }
 
-  // Entretien incomplet / non conforme
-  if (gr('preconisations') === 'NON' || gr('dernier_entretien') === 'NON' || gr('dernier_entretien_audi') === 'NON') {
-    _blocks += '<div style="background:#fef9e7;border:2px solid #e67e22;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
-      + '<div style="font-weight:700;color:#ca6f1e;font-size:13px;margin-bottom:5px">📋 Entretien incomplet ou non conforme</div>'
-      + '<p style="margin:0 0 5px;font-size:12px">L’application des participations nécessite le contrôle de tous les entretiens conformément aux préconisations constructeur.</p>'
-      + '<p style="margin:0 0 5px;font-size:12px">Une participation peut être accordée si <strong>aucun lien de causalité</strong> n’existe entre la réclamation et le service manquant.</p>'
-      + '<p style="margin:0;font-size:12px;background:rgba(230,126,34,.1);padding:5px 8px;border-radius:4px"><mark>Si un entretien est <strong>« à faire »</strong></mark>, la participation ne peut être proposée qu’après réalisation.</p>'
-      + '</div>';
-  }
-
-  // Lien dommage/entretien
-  if (gr('lien_entretien') === 'OUI') {
-    _blocks += '<div style="background:#fef9e7;border:2px solid #e67e22;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
-      + '<div style="font-weight:700;color:#ca6f1e;font-size:13px;margin-bottom:5px">🔗 Lien dommage / entretien détecté</div>'
-      + '<p style="margin:0;font-size:12px">Un lien de causalité établi entre le dommage et l’entretien rend la demande Kulanz <strong>irrecevable</strong>. Le constructeur considère que le dommage aurait pu être prévenu par un entretien conforme.</p>'
-      + '</div>';
-  }
-
-  // Si aucun bloc spécifique → message générique
-  if (!_blocks) {
-    _blocks = '<p style="font-size:12px">Kulanz non applicable dans l’état actuel des réponses fournies.</p>';
-  }
-
-  var bodyContent = _blocks;
-
+  // Bloc de synthèse en bas : récap motifs + règle marque
   zone.innerHTML = '<div class="knok-box">'
-    + '<div class="knok-title">⚠ Kulanz non applicable dans l\'état actuel</div>'
+    + '<div class="knok-title">⚠ Kulanz non applicable — voir les alertes ci-dessus</div>'
     + '<div class="knok-body">'
-    + bodyContent
-    + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(230,126,34,.3)">'
     + '<strong style="font-size:11px;color:#c0392b">Motif(s) de non-éligibilité :</strong>'
     + '<div style="margin-top:6px">' + reasonsHtml + '</div>'
-    + '</div>'
     + brandHtml
     + '</div></div>';
 
