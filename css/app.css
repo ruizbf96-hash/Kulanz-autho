@@ -545,3 +545,9 @@ textarea.field-error,
 #sp-doc-fields label{font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;margin-right:16px}
 /* Bandeau documentation requise côté usager */
 .doc-banner{background:#EAF1FB;border:1px solid #B8CCE8;color:#2C5AA0;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px}
+
+/* Badges workflow CCR */
+.b-sent{background:#EAF1FB;color:#2C5AA0;border:1px solid #B8CCE8}
+.b-doc{background:#E4F0FC;color:#1F5FA8;border:1px solid #AECBEA}
+.b-print{background:#F0EAFB;color:#6B3FA0;border:1px solid #CFBDEB}
+.b-vgf{background:#FDF3E4;color:#B26A00;border:1px solid #F0D5A8}
