@@ -124,8 +124,18 @@ var STATUTS = {
   'En attente':                  { icon: '🟡', badge: 'b-wait', traite: false },
   'Complément requis':           { icon: '🔄', badge: 'b-comp', traite: false },
   'Traitée':                     { icon: '✅', badge: 'b-ok',   traite: true },
-  'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true }
+  'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true },
+  // Workflow CCR
+  'Demande envoyée':                 { icon: '📨', badge: 'b-sent', traite: false, ccr: true },
+  'Documentation reçue':             { icon: '📄', badge: 'b-doc',  traite: false, ccr: true },
+  'Documents imprimés - à traiter':  { icon: '🖨️', badge: 'b-print',traite: false, ccr: true },
+  'Traitée - en attente VGF':        { icon: '⏳', badge: 'b-vgf',  traite: false, ccr: true },
+  'CCR accorde la PEC':              { icon: '✅', badge: 'b-ok',   traite: true,  ccr: true },
+  'CCR sans accord PEC':             { icon: '❌', badge: 'b-no',   traite: true,  ccr: true }
 };
+// Ordre des étapes CCR (pour les boutons "étape suivante")
+var CCR_WORKFLOW = ['Demande envoyée','Documentation reçue','Documents imprimés - à traiter','Traitée - en attente VGF'];
+var CCR_FINAUX = ['CCR accorde la PEC','CCR sans accord PEC'];
 var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
 function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
@@ -1572,7 +1582,7 @@ function envoyerFormulaire() {
       categorie: ge('dom-cat')?ge('dom-cat').value:'',
       email_usager: email, conseiller_client: gv('conseiller_client'),
       kilometrage: gv('kilometrage'), date_or: gv('date_or'), kvps: gv('kvps'),
-      statut: 'En attente', commentaire_team: '', commerce: null
+      statut: 'Demande envoyée', commentaire_team: '', commerce: null
     };
     // Conserver TOUS les champs du formulaire (plainte, emplacement, réponses KULANZ, codes séparés…)
     (function(snap){ for (var k in snap) if (snap.hasOwnProperty(k) && !(k in newD)) newD[k]=snap[k]; })(formSnapshot());
@@ -1981,12 +1991,7 @@ function renderHisto() {
       '<td style="font-family:monospace">'+esc(d.or||'')+'</td>'+
       '<td style="font-family:monospace;font-size:11px">'+esc(d.chassis||'')+'</td>'+
       '<td style="font-size:11px">'+esc(d.code_dommage||'')+'</td>'+
-      '<td><span class="badge '+bc+'">'+ic+' '+esc(d.statut||'')+'</span>'+
-        (d.type==='CCR' ? '<div style="margin-top:4px;font-size:13px" title="Documentation reçue / imprimée">'
-          + '<span style="opacity:'+(d.doc_recue?'1':'0.3')+'" title="Documentation '+(d.doc_recue?'reçue':'non reçue')+'">📄</span> '
-          + '<span style="opacity:'+(d.doc_imprime?'1':'0.3')+'" title="Documentation '+(d.doc_imprime?'imprimée':'non imprimée')+'">🖨️</span>'
-          + '</div>' : '')+
-      '</td>'+
+      '<td><span class="badge '+bc+'" style="font-size:12px;padding:5px 10px">'+ic+' '+esc(d.statut||'')+'</span></td>'+
       '<td>'+pec+'</td>'+
       '<td style="font-size:11px;color:#666;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.commentaire_team||'')+'">'+esc(d.commentaire_team||'—')+'</td>'+
       '<td>'+action+'</td>'+
@@ -2292,12 +2297,9 @@ function openSP(id) {
     }
   }
   var stat = ge('sp-statut');
-  if (stat) stat.value = d.statut || 'En attente';
-  // Charger l'état documentation (CCR uniquement)
-  var docFields = ge('sp-doc-fields');
-  if (docFields) docFields.style.display = (d.type === 'CCR') ? 'block' : 'none';
-  var dr = ge('sp-doc-recue'); if (dr) dr.checked = !!d.doc_recue;
-  var di = ge('sp-doc-imprime'); if (di) di.checked = !!d.doc_imprime;
+  // Remplir le menu selon le type (CCR = workflow dédié, Kulanz = statuts classiques)
+  remplirStatutsOptions(d.type, d.statut);
+  if (stat) stat.value = d.statut || (d.type === 'CCR' ? 'Demande envoyée' : 'En attente');
   var cmt = ge('sp-comment');
   if (cmt) cmt.value = d.commentaire_team || '';
   var err = ge('sp-pwd-err');
@@ -2326,7 +2328,51 @@ function closeSP() {
 function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
-  if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
+  if (!s) return;
+  // Participation commerciale : uniquement pour les statuts avec PEC/participation
+  var showCommerce = (s.value === 'Traitée' || s.value === 'CCR accorde la PEC');
+  if (c) c.style.display = showCommerce ? 'block' : 'none';
+  // Bouton étape suivante : visible tant qu'il reste une étape dans le workflow CCR
+  var nb = ge('sp-next-step');
+  if (nb) {
+    var idx = CCR_WORKFLOW.indexOf(s.value);
+    var showNext = (idx !== -1 && idx < CCR_WORKFLOW.length - 1);
+    // depuis la dernière étape workflow (en attente VGF) → proposer les statuts finaux via le menu, pas le bouton
+    nb.style.display = showNext ? 'block' : 'none';
+    if (showNext) {
+      var next = CCR_WORKFLOW[idx + 1];
+      nb.textContent = '➡️ ' + next;
+    }
+  }
+}
+
+// Remplit le menu déroulant des statuts selon le type de demande
+function remplirStatutsOptions(type, current) {
+  var s = ge('sp-statut');
+  if (!s) return;
+  var list;
+  if (type === 'CCR') {
+    list = CCR_WORKFLOW.concat(CCR_FINAUX).concat(['Complément requis']);
+  } else {
+    list = ['En attente', 'Traitée', 'Traitée sans participation', 'Complément requis'];
+  }
+  // s'assurer que le statut courant est présent
+  if (current && list.indexOf(current) === -1) list.unshift(current);
+  s.innerHTML = list.map(function(st) {
+    var info = statutInfo(st);
+    return '<option value="' + esc(st) + '">' + info.icon + ' ' + esc(st) + '</option>';
+  }).join('');
+}
+
+// Bouton "étape suivante" : avance d'un cran dans le workflow CCR
+function etapeSuivanteCCR() {
+  var s = ge('sp-statut');
+  if (!s) return;
+  var idx = CCR_WORKFLOW.indexOf(s.value);
+  if (idx !== -1 && idx < CCR_WORKFLOW.length - 1) {
+    s.value = CCR_WORKFLOW[idx + 1];
+    onStatutChange();
+  }
 }
 
 // Effacer une demande (TeamGarantie uniquement) : PIN + double confirmation
@@ -2383,9 +2429,7 @@ function validerSP() {
   var update = {
     statut: statut,
     commentaire_team: commentaire,
-    commerce: statut==='Traitée' ? commerce : (d.commerce||null),
-    doc_recue: ge('sp-doc-recue') ? ge('sp-doc-recue').checked : (d.doc_recue||false),
-    doc_imprime: ge('sp-doc-imprime') ? ge('sp-doc-imprime').checked : (d.doc_imprime||false)
+    commerce: (statut==='Traitée' || statut==='CCR accorde la PEC') ? commerce : (d.commerce||null)
   };
 
   var doSave = function() {
@@ -3131,15 +3175,15 @@ function checkDocRequise() {
   // demandes CCR de l'usager (son site) en attente de documentation
   var mySite = G.site || '';
   var docs = (G.demandes || []).filter(function(d) {
-    return d.type === 'CCR' && !statutEstTraite(d.statut) && !d.doc_recue && (!mySite || d.site === mySite);
+    return d.type === 'CCR' && d.statut === 'Demande envoyée' && (!mySite || d.site === mySite);
   });
   if (!docs.length) { banner.style.display = 'none'; return; }
   var liste = docs.map(function(d) {
     return '<li style="margin:2px 0">OR <strong>' + esc(d.or || '—') + '</strong> — châssis ' + esc(d.chassis || '—') + '</li>';
   }).join('');
-  banner.innerHTML = '📄 <strong>Documentation en attente</strong> — '
-    + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR pour laquelle la documentation n\'a pas encore été reçue :'
+  banner.innerHTML = '📄 <strong>Documentation à envoyer</strong> — '
+    + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR en attente de vos documents :'
     + '<ul style="margin:6px 0 0;padding-left:20px">' + liste + '</ul>'
-    + '<div style="margin-top:6px;font-size:12px">Merci de transmettre les documents à la TeamGarantie pour que le dossier puisse avancer.</div>';
+    + '<div style="margin-top:6px;font-size:12px">Merci d\'envoyer les documents par e-mail à la TeamGarantie pour que le dossier puisse avancer.</div>';
   banner.style.display = 'block';
 }
