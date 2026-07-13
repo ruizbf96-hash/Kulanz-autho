@@ -122,12 +122,11 @@ var G = {
 // ═══════════════════════════════════════════════════════════
 var STATUTS = {
   'En attente':                  { icon: '🟡', badge: 'b-wait', traite: false },
-  'Documentation requise':       { icon: '📄', badge: 'b-doc',  traite: false },
   'Complément requis':           { icon: '🔄', badge: 'b-comp', traite: false },
   'Traitée':                     { icon: '✅', badge: 'b-ok',   traite: true },
   'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true }
 };
-var STATUTS_ORDRE = ['En attente','Documentation requise','Traitée','Traitée sans participation','Complément requis'];
+var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
 function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
 
@@ -1982,7 +1981,12 @@ function renderHisto() {
       '<td style="font-family:monospace">'+esc(d.or||'')+'</td>'+
       '<td style="font-family:monospace;font-size:11px">'+esc(d.chassis||'')+'</td>'+
       '<td style="font-size:11px">'+esc(d.code_dommage||'')+'</td>'+
-      '<td><span class="badge '+bc+'">'+ic+' '+esc(d.statut||'')+'</span></td>'+
+      '<td><span class="badge '+bc+'">'+ic+' '+esc(d.statut||'')+'</span>'+
+        (d.type==='CCR' ? '<div style="margin-top:4px;font-size:13px" title="Documentation reçue / imprimée">'
+          + '<span style="opacity:'+(d.doc_recue?'1':'0.3')+'" title="Documentation '+(d.doc_recue?'reçue':'non reçue')+'">📄</span> '
+          + '<span style="opacity:'+(d.doc_imprime?'1':'0.3')+'" title="Documentation '+(d.doc_imprime?'imprimée':'non imprimée')+'">🖨️</span>'
+          + '</div>' : '')+
+      '</td>'+
       '<td>'+pec+'</td>'+
       '<td style="font-size:11px;color:#666;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.commentaire_team||'')+'">'+esc(d.commentaire_team||'—')+'</td>'+
       '<td>'+action+'</td>'+
@@ -2289,7 +2293,9 @@ function openSP(id) {
   }
   var stat = ge('sp-statut');
   if (stat) stat.value = d.statut || 'En attente';
-  // Charger l'état documentation
+  // Charger l'état documentation (CCR uniquement)
+  var docFields = ge('sp-doc-fields');
+  if (docFields) docFields.style.display = (d.type === 'CCR') ? 'block' : 'none';
   var dr = ge('sp-doc-recue'); if (dr) dr.checked = !!d.doc_recue;
   var di = ge('sp-doc-imprime'); if (di) di.checked = !!d.doc_imprime;
   var cmt = ge('sp-comment');
@@ -2321,8 +2327,6 @@ function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
   if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
-  var doc = ge('sp-doc-fields');
-  if (s && doc) doc.style.display = (s.value === 'Documentation requise') ? 'block' : 'none';
 }
 
 // Effacer une demande (TeamGarantie uniquement) : PIN + double confirmation
@@ -3127,15 +3131,15 @@ function checkDocRequise() {
   // demandes CCR de l'usager (son site) en attente de documentation
   var mySite = G.site || '';
   var docs = (G.demandes || []).filter(function(d) {
-    return d.type === 'CCR' && d.statut === 'Documentation requise' && (!mySite || d.site === mySite);
+    return d.type === 'CCR' && !statutEstTraite(d.statut) && !d.doc_recue && (!mySite || d.site === mySite);
   });
   if (!docs.length) { banner.style.display = 'none'; return; }
   var liste = docs.map(function(d) {
     return '<li style="margin:2px 0">OR <strong>' + esc(d.or || '—') + '</strong> — châssis ' + esc(d.chassis || '—') + '</li>';
   }).join('');
-  banner.innerHTML = '📄 <strong>Documentation requise</strong> — '
-    + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR en attente de documents de votre part :'
+  banner.innerHTML = '📄 <strong>Documentation en attente</strong> — '
+    + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR pour laquelle la documentation n\'a pas encore été reçue :'
     + '<ul style="margin:6px 0 0;padding-left:20px">' + liste + '</ul>'
-    + '<div style="margin-top:6px;font-size:12px">Merci de transmettre les documents demandés à la TeamGarantie pour que le dossier puisse avancer.</div>';
+    + '<div style="margin-top:6px;font-size:12px">Merci de transmettre les documents à la TeamGarantie pour que le dossier puisse avancer.</div>';
   banner.style.display = 'block';
 }
