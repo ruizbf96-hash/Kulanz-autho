@@ -551,3 +551,7 @@ textarea.field-error,
 .b-doc{background:#E4F0FC;color:#1F5FA8;border:1px solid #AECBEA}
 .b-print{background:#F0EAFB;color:#6B3FA0;border:1px solid #CFBDEB}
 .b-vgf{background:#FDF3E4;color:#B26A00;border:1px solid #F0D5A8}
+
+/* Menu déroulant de statut dans le tableau */
+select.row-statut{border:1px solid currentColor;-webkit-appearance:none;appearance:none;background-image:none;max-width:210px}
+select.row-statut:hover{filter:brightness(.97)}
