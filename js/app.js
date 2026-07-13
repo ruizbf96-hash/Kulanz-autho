@@ -122,11 +122,12 @@ var G = {
 // ═══════════════════════════════════════════════════════════
 var STATUTS = {
   'En attente':                  { icon: '🟡', badge: 'b-wait', traite: false },
+  'Documentation requise':       { icon: '📄', badge: 'b-doc',  traite: false },
   'Complément requis':           { icon: '🔄', badge: 'b-comp', traite: false },
   'Traitée':                     { icon: '✅', badge: 'b-ok',   traite: true },
   'Traitée sans participation':  { icon: '❌', badge: 'b-no',   traite: true }
 };
-var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
+var STATUTS_ORDRE = ['En attente','Documentation requise','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
 function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
 
@@ -1693,6 +1694,7 @@ function envoyerFormulaire() {
 
 function nouvelleDemande() {
   ge('success-overlay').classList.remove('open');
+  if (typeof resetEnquete === 'function') resetEnquete();
   G.editingId = null;
   G.editOnly = false;
   G._dirty = false;
@@ -1878,6 +1880,7 @@ function setHistoType(type) {
 }
 
 function renderHisto() {
+  if (typeof checkDocRequise === 'function') checkDocRequise();
   // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
   var fS  = G.role==='usager' ? G.site : ge('f-site').value;
   var fT  = G.histoType || 'Kulanz';   // onglet actif Kulanz / CCR
@@ -2240,6 +2243,7 @@ function openSP(id) {
   G.activeId = id;
   var d = G.demandes.find(function(x) { return x.id == id; });
   if (!d) return;
+  var delBtn = ge('sp-del-btn'); if (delBtn) delBtn.style.display = (G.role === 'team') ? '' : 'none';
   var setText = function(elId, val) { var e=ge(elId); if(e) e.textContent=val||'—'; };
   setText('sp-sub',d.type+' — OR '+d.or+' — '+d.date);
   setText('sp-sub',     d.type+' — OR '+d.or+' — '+d.date);
@@ -2285,6 +2289,9 @@ function openSP(id) {
   }
   var stat = ge('sp-statut');
   if (stat) stat.value = d.statut || 'En attente';
+  // Charger l'état documentation
+  var dr = ge('sp-doc-recue'); if (dr) dr.checked = !!d.doc_recue;
+  var di = ge('sp-doc-imprime'); if (di) di.checked = !!d.doc_imprime;
   var cmt = ge('sp-comment');
   if (cmt) cmt.value = d.commentaire_team || '';
   var err = ge('sp-pwd-err');
@@ -2314,6 +2321,33 @@ function onStatutChange() {
   var s = ge('sp-statut');
   var c = ge('sp-commerce');
   if (s && c) c.style.display = s.value==='Traitée' ? 'block' : 'none';
+  var doc = ge('sp-doc-fields');
+  if (s && doc) doc.style.display = (s.value === 'Documentation requise') ? 'block' : 'none';
+}
+
+// Effacer une demande (TeamGarantie uniquement) : PIN + double confirmation
+function supprimerDemande() {
+  if (G.role !== 'team') { toast('Réservé à la TeamGarantie.'); return; }
+  var d = G.demandes.find(function(x) { return x.id == G.activeId; });
+  if (!d) { toast('Demande introuvable.'); return; }
+  // 1) Confirmation
+  if (!confirm('Vous êtes sûr d\'effacer la demande ?\n\n' + (d.type||'') + ' — OR ' + (d.or||'') + ' — ' + (d.site||'') + '\n\nCette action est définitive.')) return;
+  // 2) Code PIN
+  var pin = prompt('Saisissez le code PIN pour confirmer la suppression :');
+  if (pin === null) return; // annulé
+  if (pin !== MOT_DE_PASSE) { toast('❌ Code PIN incorrect.'); return; }
+  // 3) Suppression Firebase
+  var key = 'd' + String(d.id).replace(/[^a-zA-Z0-9]/g, '');
+  var del = demandesRef ? demandesRef.child(key).remove()
+    : (function(){ var i=G.demandes.findIndex(function(x){return x.id==d.id;}); if(i!==-1) G.demandes.splice(i,1); return Promise.resolve(); })();
+  Promise.resolve(del).then(function() {
+    G.demandes = G.demandes.filter(function(x){ return x.id != d.id; });
+    closeSP(); renderHisto(); if (G.role==='team') renderDash();
+    toast('🗑 Demande effacée.');
+  }).catch(function(err) {
+    console.warn('Suppression:', err);
+    toast('❌ Erreur lors de la suppression.');
+  });
 }
 
 function validerSP() {
@@ -2345,7 +2379,9 @@ function validerSP() {
   var update = {
     statut: statut,
     commentaire_team: commentaire,
-    commerce: statut==='Traitée' ? commerce : (d.commerce||null)
+    commerce: statut==='Traitée' ? commerce : (d.commerce||null),
+    doc_recue: ge('sp-doc-recue') ? ge('sp-doc-recue').checked : (d.doc_recue||false),
+    doc_imprime: ge('sp-doc-imprime') ? ge('sp-doc-imprime').checked : (d.doc_imprime||false)
   };
 
   var doSave = function() {
@@ -3002,3 +3038,104 @@ window.addEventListener('beforeunload', function(e) {
   e.returnValue = ''; // message standardisé par le navigateur
   return '';
 });
+
+// ═══════════════════════════════════════════════════════════
+// ENQUÊTE DE SATISFACTION (écran de confirmation)
+// ═══════════════════════════════════════════════════════════
+var G_survey = { facilite: 0, rapidite: 0, global: 0 };
+
+// Sélection des étoiles (délégation)
+document.addEventListener('click', function(e) {
+  var star = e.target.closest ? e.target.closest('.stars span') : null;
+  if (!star) return;
+  var wrap = star.parentNode;
+  var q = wrap.getAttribute('data-q');
+  var v = parseInt(star.getAttribute('data-v'), 10);
+  if (!q || !v) return;
+  G_survey[q] = v;
+  // colorer les étoiles jusqu'à v
+  [].forEach.call(wrap.querySelectorAll('span'), function(s) {
+    var sv = parseInt(s.getAttribute('data-v'), 10);
+    s.textContent = sv <= v ? '★' : '☆';
+    s.classList.toggle('on', sv <= v);
+  });
+});
+
+function envoyerEnquete() {
+  // Récupérer les sujets cochés
+  var topics = [];
+  [].forEach.call(document.querySelectorAll('#survey-topics input:checked'), function(c) { topics.push(c.value); });
+
+  // Au moins une note ou un sujet
+  if (!G_survey.facilite && !G_survey.rapidite && !G_survey.global && !topics.length) {
+    toast('Merci de donner au moins une note.');
+    return;
+  }
+
+  var rec = {
+    id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    date: new Date().toLocaleDateString('fr-FR'),
+    heure: new Date().toLocaleTimeString('fr-FR'),
+    site: (ge('f-site') ? ge('f-site').value : '') || '',
+    role: G.role || '',
+    facilite: G_survey.facilite || null,
+    rapidite: G_survey.rapidite || null,
+    global: G_survey.global || null,
+    ameliorations: topics
+  };
+
+  var key = 's' + String(rec.id).replace(/[^a-zA-Z0-9]/g, '');
+  var save;
+  try {
+    if (typeof db !== 'undefined' && db) {
+      save = db.ref('enquetes').child(key).set(rec);
+    } else {
+      save = Promise.resolve();
+    }
+  } catch (e) { save = Promise.resolve(); }
+
+  Promise.resolve(save).then(function() {
+    var block = ge('survey-block');
+    if (block) {
+      // masquer le formulaire, afficher le remerciement
+      [].forEach.call(block.querySelectorAll('.survey-q, .btn-survey'), function(el) { el.style.display = 'none'; });
+      var t = ge('survey-thanks'); if (t) t.style.display = 'block';
+    }
+  }).catch(function(err) {
+    console.warn('Enquête:', err);
+    toast('❌ Impossible d\'enregistrer l\'avis.');
+  });
+}
+
+// Réinitialiser l'enquête pour la prochaine demande
+function resetEnquete() {
+  G_survey = { facilite: 0, rapidite: 0, global: 0 };
+  [].forEach.call(document.querySelectorAll('#survey-block .stars span'), function(s) { s.textContent = '☆'; s.classList.remove('on'); });
+  [].forEach.call(document.querySelectorAll('#survey-topics input:checked'), function(c) { c.checked = false; });
+  var block = ge('survey-block');
+  if (block) [].forEach.call(block.querySelectorAll('.survey-q, .btn-survey'), function(el) { el.style.display = ''; });
+  var t = ge('survey-thanks'); if (t) t.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Notification "Documentation requise" côté usager
+// ═══════════════════════════════════════════════════════════
+function checkDocRequise() {
+  var banner = ge('doc-required-banner');
+  if (!banner) return;
+  if (G.role !== 'usager') { banner.style.display = 'none'; return; }
+  // demandes CCR de l'usager (son site) en attente de documentation
+  var mySite = G.site || '';
+  var docs = (G.demandes || []).filter(function(d) {
+    return d.type === 'CCR' && d.statut === 'Documentation requise' && (!mySite || d.site === mySite);
+  });
+  if (!docs.length) { banner.style.display = 'none'; return; }
+  var liste = docs.map(function(d) {
+    return '<li style="margin:2px 0">OR <strong>' + esc(d.or || '—') + '</strong> — châssis ' + esc(d.chassis || '—') + '</li>';
+  }).join('');
+  banner.innerHTML = '📄 <strong>Documentation requise</strong> — '
+    + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR en attente de documents de votre part :'
+    + '<ul style="margin:6px 0 0;padding-left:20px">' + liste + '</ul>'
+    + '<div style="margin-top:6px;font-size:12px">Merci de transmettre les documents demandés à la TeamGarantie pour que le dossier puisse avancer.</div>';
+  banner.style.display = 'block';
+}
