@@ -136,6 +136,7 @@ var STATUTS = {
 // Ordre des étapes CCR (pour les boutons "étape suivante")
 var CCR_WORKFLOW = ['Demande envoyée','Documentation reçue','Documents imprimés - à traiter','Traitée - en attente VGF'];
 var CCR_FINAUX = ['CCR accorde la PEC','CCR sans accord PEC'];
+var STATUTS_ORDRE_CCR = CCR_WORKFLOW.concat(CCR_FINAUX).concat(['Complément requis']);
 var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
 function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
@@ -1888,6 +1889,43 @@ function setHistoType(type) {
   renderHisto();
 }
 
+// Changement de statut directement depuis le tableau (CCR uniquement)
+function changerStatutLigne(id, nouveauStatut) {
+  if (G.role !== 'team') return;
+  var d = G.demandes.find(function(x) { return x.id == id; });
+  if (!d) return;
+  var ancienStatut = d.statut;
+  var estFinal = (CCR_FINAUX.indexOf(nouveauStatut) !== -1);
+
+  if (estFinal) {
+    if (!confirm('Passer la demande au statut « ' + nouveauStatut + ' » ?\n\nUn e-mail de réponse sera préparé pour l\'usager.')) {
+      renderHisto();
+      return;
+    }
+  }
+
+  d.statut = nouveauStatut;
+  var update = { statut: nouveauStatut };
+  var key = 'd' + String(d.id).replace(/[^a-zA-Z0-9]/g, '');
+  var save = demandesRef ? demandesRef.child(key).update(update) : Promise.resolve();
+
+  Promise.resolve(save).then(function() {
+    renderHisto(); if (G.role === 'team') renderDash();
+    if (estFinal) {
+      var commerce = d.commerce || null;
+      toast('✔ ' + nouveauStatut + ' — préparation du mail…');
+      if (typeof envoyerMailKulanz === 'function') envoyerMailKulanz(d, nouveauStatut, d.commentaire_team || '', commerce);
+    } else {
+      toast('✔ Statut : ' + nouveauStatut);
+    }
+  }).catch(function(err) {
+    console.warn('Changement statut:', err);
+    d.statut = ancienStatut;
+    renderHisto();
+    toast('❌ Erreur lors du changement de statut.');
+  });
+}
+
 function renderHisto() {
   if (typeof checkDocRequise === 'function') checkDocRequise();
   // filtre site via G.site (TeamGarantie: via f-site, usager: son site)
@@ -1991,7 +2029,16 @@ function renderHisto() {
       '<td style="font-family:monospace">'+esc(d.or||'')+'</td>'+
       '<td style="font-family:monospace;font-size:11px">'+esc(d.chassis||'')+'</td>'+
       '<td style="font-size:11px">'+esc(d.code_dommage||'')+'</td>'+
-      '<td><span class="badge '+bc+'" style="font-size:12px;padding:5px 10px">'+ic+' '+esc(d.statut||'')+'</span></td>'+
+      '<td>'+(
+        (d.type==='CCR' && G.role==='team')
+        ? '<select class="row-statut badge '+bc+'" data-id="'+esc(String(d.id))+'" onclick="event.stopPropagation()" onchange="changerStatutLigne(\''+esc(String(d.id))+'\',this.value)" style="font-size:11.5px;padding:5px 8px;border-radius:8px;cursor:pointer;font-weight:600">'
+          + STATUTS_ORDRE_CCR.map(function(st){
+              var inf=statutInfo(st);
+              return '<option value="'+esc(st)+'"'+(st===d.statut?' selected':'')+'>'+inf.icon+' '+esc(st)+'</option>';
+            }).join('')
+          + '</select>'
+        : '<span class="badge '+bc+'" style="font-size:12px;padding:5px 10px">'+ic+' '+esc(d.statut||'')+'</span>'
+      )+'</td>'+
       '<td>'+pec+'</td>'+
       '<td style="font-size:11px;color:#666;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.commentaire_team||'')+'">'+esc(d.commentaire_team||'—')+'</td>'+
       '<td>'+action+'</td>'+
@@ -2447,8 +2494,11 @@ function validerSP() {
     .then(function() {
       closeSP(); renderHisto(); renderDash();
       toast('✔ Statut mis à jour : '+statut);
-      // Envoi mail + PDF Kulanz si statut final
-      if (statut !== 'En attente') {
+      // Envoi mail : CCR → uniquement statuts finaux (PEC / sans PEC) ; Kulanz → statuts traités
+      var doitEnvoyer = (d.type === 'CCR')
+        ? (CCR_FINAUX.indexOf(statut) !== -1)
+        : (statut !== 'En attente' && statut !== 'Complément requis');
+      if (doitEnvoyer) {
         envoyerMailKulanz(d, statut, commentaire, commerce);
       }
     })
