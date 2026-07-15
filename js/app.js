@@ -136,6 +136,8 @@ var STATUTS = {
 // Ordre des étapes CCR (pour les boutons "étape suivante")
 var CCR_WORKFLOW = ['Demande envoyée','Documentation reçue','Documents imprimés - à traiter','Traitée - en attente VGF'];
 var CCR_FINAUX = ['CCR accorde la PEC','CCR sans accord PEC'];
+// Statuts CCR qui déclenchent l'ouverture du mailto (finaux + demande de complément)
+var CCR_MAIL = ['CCR accorde la PEC','CCR sans accord PEC','Complément requis'];
 var STATUTS_ORDRE_CCR = CCR_WORKFLOW.concat(CCR_FINAUX).concat(['Complément requis']);
 var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
@@ -1895,10 +1897,10 @@ function changerStatutLigne(id, nouveauStatut) {
   var d = G.demandes.find(function(x) { return x.id == id; });
   if (!d) return;
   var ancienStatut = d.statut;
-  var estFinal = (CCR_FINAUX.indexOf(nouveauStatut) !== -1);
+  var envoieMail = (CCR_MAIL.indexOf(nouveauStatut) !== -1);
 
-  if (estFinal) {
-    if (!confirm('Passer la demande au statut « ' + nouveauStatut + ' » ?\n\nUn e-mail de réponse sera préparé pour l\'usager.')) {
+  if (envoieMail) {
+    if (!confirm('Passer la demande au statut « ' + nouveauStatut + ' » ?\n\nUn e-mail sera préparé pour l\'usager.')) {
       renderHisto();
       return;
     }
@@ -1911,7 +1913,7 @@ function changerStatutLigne(id, nouveauStatut) {
 
   Promise.resolve(save).then(function() {
     renderHisto(); if (G.role === 'team') renderDash();
-    if (estFinal) {
+    if (envoieMail) {
       var commerce = d.commerce || null;
       toast('✔ ' + nouveauStatut + ' — préparation du mail…');
       if (typeof envoyerMailKulanz === 'function') envoyerMailKulanz(d, nouveauStatut, d.commentaire_team || '', commerce);
@@ -2494,9 +2496,9 @@ function validerSP() {
     .then(function() {
       closeSP(); renderHisto(); renderDash();
       toast('✔ Statut mis à jour : '+statut);
-      // Envoi mail : CCR → uniquement statuts finaux (PEC / sans PEC) ; Kulanz → statuts traités
+      // Envoi mail : CCR → statuts finaux (PEC / sans PEC) + Complément requis ; Kulanz → statuts traités
       var doitEnvoyer = (d.type === 'CCR')
-        ? (CCR_FINAUX.indexOf(statut) !== -1)
+        ? (CCR_MAIL.indexOf(statut) !== -1)
         : (statut !== 'En attente' && statut !== 'Complément requis');
       if (doitEnvoyer) {
         envoyerMailKulanz(d, statut, commentaire, commerce);
