@@ -129,16 +129,18 @@ var STATUTS = {
   'Demande envoyée':                 { icon: '📨', badge: 'b-sent', traite: false, ccr: true },
   'Documentation reçue':             { icon: '📄', badge: 'b-doc',  traite: false, ccr: true },
   'Documents imprimés - à traiter':  { icon: '🖨️', badge: 'b-print',traite: false, ccr: true },
-  'Traitée - en attente VGF':        { icon: '⏳', badge: 'b-vgf',  traite: false, ccr: true },
-  'CCR accorde la PEC':              { icon: '✅', badge: 'b-ok',   traite: true,  ccr: true },
-  'CCR sans accord PEC':             { icon: '❌', badge: 'b-no',   traite: true,  ccr: true }
+  'Traitée (en cours CCR)':          { icon: '⏳', badge: 'b-vgf',  traite: false, ccr: true },
+  'Validée CCR':                     { icon: '✅', badge: 'b-ok',   traite: true,  ccr: true },
+  'Traité sans participation':       { icon: '❌', badge: 'b-no',   traite: true,  ccr: true }
 };
 // Ordre des étapes CCR (pour les boutons "étape suivante")
-var CCR_WORKFLOW = ['Demande envoyée','Documentation reçue','Documents imprimés - à traiter','Traitée - en attente VGF'];
-var CCR_FINAUX = ['CCR accorde la PEC','CCR sans accord PEC'];
+var CCR_WORKFLOW = ['Demande envoyée','Documentation reçue','Documents imprimés - à traiter','Traitée (en cours CCR)'];
+var CCR_FINAUX = ['Validée CCR','Traité sans participation'];
 // Statuts CCR qui déclenchent l'ouverture du mailto (finaux + demande de complément)
-var CCR_MAIL = ['CCR accorde la PEC','CCR sans accord PEC','Complément requis'];
+var CCR_MAIL = ['Validée CCR','Traité sans participation','Complément requis'];
 var STATUTS_ORDRE_CCR = CCR_WORKFLOW.concat(CCR_FINAUX).concat(['Complément requis']);
+// Responsables (impression / traitement CCR)
+var RESPONSABLES = ['', 'Nico', 'Marion', 'Céline', 'Tahir', 'Omar'];
 var STATUTS_ORDRE = ['En attente','Traitée','Traitée sans participation','Complément requis'];
 function statutInfo(s) { return STATUTS[s] || STATUTS['En attente']; }
 function statutEstTraite(s) { return !!(STATUTS[s] && STATUTS[s].traite); }
@@ -1635,6 +1637,9 @@ function envoyerFormulaire() {
       +'<br>\ud83d\udcce <strong>3.</strong> Joindre le <strong>PDF</strong> + documents justificatifs'
       +'<br>\ud83d\udce4 <strong>4.</strong> Envoyer depuis Outlook</div>';
     G._dirty = false; ge('success-overlay').classList.add('open');
+    // Bloc documents CCR : afficher + mémoriser la demande pour le mailto
+    G._lastCCR = { site: newD.site, or: newD.or, chassis: newD.chassis, email: newD.email_usager };
+    var _cdb = ge('ccr-docs-block'); if (_cdb) _cdb.style.display = 'block';
     setTimeout(function(){
       btn.disabled = false;
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Envoyer la demande';
@@ -1695,6 +1700,7 @@ function envoyerFormulaire() {
       '<strong>Type\u00a0:</strong> '+esc(rec.type)+'<br>'+
       '<strong>N\u00b0 OR\u00a0:</strong> '+esc(rec.or)+'<br>'+
       '<strong>Ch\u00e2ssis\u00a0:</strong> '+esc(rec.chassis);
+    var _cdbK = ge('ccr-docs-block'); if (_cdbK) _cdbK.style.display = 'none';
     G._dirty = false; ge('success-overlay').classList.add('open');
   })
   .catch(function(err){ console.error(err); toast('\u274c Erreur d\'enregistrement \u2013 reessayez.'); })
@@ -1707,6 +1713,7 @@ function envoyerFormulaire() {
 function nouvelleDemande() {
   ge('success-overlay').classList.remove('open');
   if (typeof resetEnquete === 'function') resetEnquete();
+  var _cdb = ge('ccr-docs-block'); if (_cdb) _cdb.style.display = 'none';
   G.editingId = null;
   G.editOnly = false;
   G._dirty = false;
@@ -1891,6 +1898,22 @@ function setHistoType(type) {
   renderHisto();
 }
 
+// Assigner un responsable (impression / traitement CCR) depuis le tableau
+function changerResponsable(id, resp) {
+  if (G.role !== 'team') return;
+  var d = G.demandes.find(function(x) { return x.id == id; });
+  if (!d) return;
+  d.responsable = resp;
+  var key = 'd' + String(d.id).replace(/[^a-zA-Z0-9]/g, '');
+  var save = demandesRef ? demandesRef.child(key).update({ responsable: resp }) : Promise.resolve();
+  Promise.resolve(save).then(function() {
+    toast(resp ? ('✔ Responsable : ' + resp) : '✔ Responsable retiré');
+  }).catch(function(err) {
+    console.warn('Responsable:', err);
+    toast('❌ Erreur.');
+  });
+}
+
 // Changement de statut directement depuis le tableau (CCR uniquement)
 function changerStatutLigne(id, nouveauStatut) {
   if (G.role !== 'team') return;
@@ -2040,6 +2063,15 @@ function renderHisto() {
             }).join('')
           + '</select>'
         : '<span class="badge '+bc+'" style="font-size:12px;padding:5px 10px">'+ic+' '+esc(d.statut||'')+'</span>'
+      )+'</td>'+
+      '<td>'+(
+        (d.type==='CCR' && G.role==='team')
+        ? '<select class="row-resp" data-id="'+esc(String(d.id))+'" onclick="event.stopPropagation()" onchange="changerResponsable(\''+esc(String(d.id))+'\',this.value)" style="font-size:11.5px;padding:4px 6px;border-radius:6px;cursor:pointer;border:1px solid var(--line,#E7E2D7)">'
+          + RESPONSABLES.map(function(rp){
+              return '<option value="'+esc(rp)+'"'+(rp===(d.responsable||'')?' selected':'')+'>'+(rp||'—')+'</option>';
+            }).join('')
+          + '</select>'
+        : '<span style="font-size:11px;color:#666">'+esc(d.responsable||'—')+'</span>'
       )+'</td>'+
       '<td>'+pec+'</td>'+
       '<td style="font-size:11px;color:#666;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.commentaire_team||'')+'">'+esc(d.commentaire_team||'—')+'</td>'+
@@ -2351,6 +2383,8 @@ function openSP(id) {
   if (stat) stat.value = d.statut || (d.type === 'CCR' ? 'Demande envoyée' : 'En attente');
   var cmt = ge('sp-comment');
   if (cmt) cmt.value = d.commentaire_team || '';
+  var resp = ge('sp-responsable');
+  if (resp) resp.value = d.responsable || '';
   var err = ge('sp-pwd-err');
   if (err) err.style.display = 'none';
   var c = d.commerce || {};
@@ -2379,7 +2413,7 @@ function onStatutChange() {
   var c = ge('sp-commerce');
   if (!s) return;
   // Participation commerciale : uniquement pour les statuts avec PEC/participation
-  var showCommerce = (s.value === 'Traitée' || s.value === 'CCR accorde la PEC');
+  var showCommerce = (s.value === 'Traitée' || s.value === 'Validée CCR');
   if (c) c.style.display = showCommerce ? 'block' : 'none';
   // Bouton étape suivante : visible tant qu'il reste une étape dans le workflow CCR
   var nb = ge('sp-next-step');
@@ -2478,7 +2512,8 @@ function validerSP() {
   var update = {
     statut: statut,
     commentaire_team: commentaire,
-    commerce: (statut==='Traitée' || statut==='CCR accorde la PEC') ? commerce : (d.commerce||null)
+    responsable: ge('sp-responsable') ? ge('sp-responsable').value : (d.responsable||''),
+    commerce: (statut==='Traitée' || statut==='Validée CCR') ? commerce : (d.commerce||null)
   };
 
   var doSave = function() {
@@ -3231,11 +3266,56 @@ function checkDocRequise() {
   });
   if (!docs.length) { banner.style.display = 'none'; return; }
   var liste = docs.map(function(d) {
-    return '<li style="margin:2px 0">OR <strong>' + esc(d.or || '—') + '</strong> — châssis ' + esc(d.chassis || '—') + '</li>';
+    return '<li style="margin:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">OR <strong>' + esc(d.or || '—') + '</strong> — châssis ' + esc(d.chassis || '—')
+      + ' <button onclick="envoyerDocsPourDemande(\'' + esc(String(d.id)) + '\')" style="padding:3px 9px;background:#2C5AA0;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📧 Envoyer les documents</button></li>';
   }).join('');
   banner.innerHTML = '📄 <strong>Documentation à envoyer</strong> — '
     + docs.length + ' demande' + (docs.length > 1 ? 's' : '') + ' CCR en attente de vos documents :'
-    + '<ul style="margin:6px 0 0;padding-left:20px">' + liste + '</ul>'
-    + '<div style="margin-top:6px;font-size:12px">Merci d\'envoyer les documents par e-mail à la TeamGarantie pour que le dossier puisse avancer.</div>';
+    + '<ul style="margin:6px 0 0;padding-left:20px;list-style:none">' + liste + '</ul>'
+    + '<div style="margin-top:6px;font-size:12px">Cliquez sur « Envoyer les documents » : un e-mail s\'ouvre pré-rempli, joignez vos fichiers puis envoyez.</div>';
   banner.style.display = 'block';
 }
+
+// ═══════════════════════════════════════════════════════════
+// Envoi des documents CCR par e-mail (mailto pré-rempli, sans stockage)
+// ═══════════════════════════════════════════════════════════
+function envoyerDocumentsCCR() {
+  var d = G._lastCCR || {};
+  envoyerDocsMailto(d, true);
+}
+
+// Envoi documents pour une demande précise (depuis le bandeau usager)
+function envoyerDocsPourDemande(id) {
+  var dem = G.demandes.find(function(x) { return x.id == id; });
+  if (!dem) { toast('Demande introuvable.'); return; }
+  envoyerDocsMailto({ site: dem.site, or: dem.or, chassis: dem.chassis, email: dem.email_usager }, false);
+}
+
+// Construit et ouvre le mailto de documents (avec ou sans checklist)
+function envoyerDocsMailto(d, useChecklist) {
+  d = d || {};
+  var coches = [];
+  if (useChecklist) {
+    [].forEach.call(document.querySelectorAll('#ccr-doc-list .ccr-doc'), function(lbl) {
+      var cb = lbl.querySelector('input');
+      if (cb && cb.checked) coches.push('  - ' + lbl.textContent.trim());
+    });
+  } else {
+    coches = ['  - Copie de l\'ordre de réparation (OR)', '  - Devis / facture au taux garantie',
+      '  - Photos de la pièce / du dommage', '  - Historique d\'entretien', '  - Feuille commentaire technicien', '  - IQ généré'];
+  }
+  var sujet = 'Documents CCR - OR ' + (d.or || '') + ' - ' + (d.site || '');
+  var corps = 'Bonjour,\n\n'
+    + 'Veuillez trouver ci-joint les documents relatifs à la demande CCR suivante :\n\n'
+    + '  Site    : ' + (d.site || '—') + '\n'
+    + '  N° OR   : ' + (d.or || '—') + '\n'
+    + '  Châssis : ' + (d.chassis || '—') + '\n\n'
+    + 'Documents joints :\n' + (coches.length ? coches.join('\n') : '  (à joindre)')
+    + '\n\n⚠ Pensez à joindre les fichiers à cet e-mail avant de l\'envoyer.\n\nCordialement.';
+  var mailto = 'mailto:teamgarantie@geauto.fr'
+    + '?subject=' + encodeURIComponent(sujet)
+    + '&body=' + encodeURIComponent(corps.substring(0, 1800));
+  window.location.href = mailto;
+  toast('📧 E-mail préparé — joignez vos documents puis envoyez.');
+}
+
