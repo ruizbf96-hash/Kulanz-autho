@@ -162,6 +162,23 @@
     <div class="success-details" id="success-details"></div>
     <p style="font-size:11px;color:var(--muted)">Votre demande est enregistrée. Son suivi se fait dans l'onglet « Historique ».</p>
 
+    <!-- BLOC DOCUMENTS CCR (affiché uniquement pour une demande CCR) -->
+    <div id="ccr-docs-block" style="display:none;margin:18px 0;padding:16px;background:#EAF1FB;border:1px solid #B8CCE8;border-radius:12px;text-align:left">
+      <div style="font-weight:700;font-size:14px;color:#2C5AA0;margin-bottom:4px;text-align:center">📎 Documents à envoyer</div>
+      <p style="font-size:11.5px;color:var(--muted);text-align:center;margin:0 0 12px">Pour une demande CCR, transmettez les documents à la TeamGarantie par e-mail.</p>
+      <div style="font-size:12.5px;font-weight:600;margin-bottom:6px">Documents généralement attendus :</div>
+      <div id="ccr-doc-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+        <label class="ccr-doc"><input type="checkbox" checked> Copie de l'ordre de réparation (OR)</label>
+        <label class="ccr-doc"><input type="checkbox" checked> Devis / facture au taux garantie</label>
+        <label class="ccr-doc"><input type="checkbox"> Photos de la pièce / du dommage</label>
+        <label class="ccr-doc"><input type="checkbox"> Historique d'entretien du véhicule</label>
+        <label class="ccr-doc"><input type="checkbox"> Feuille commentaire technicien</label>
+        <label class="ccr-doc"><input type="checkbox"> IQ généré</label>
+      </div>
+      <button onclick="envoyerDocumentsCCR()" style="width:100%;padding:10px;background:#2C5AA0;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer">📧 Préparer l'e-mail avec ces documents</button>
+      <p style="font-size:10.5px;color:var(--muted);margin:8px 0 0;text-align:center">L'e-mail s'ouvre pré-rempli : joignez vos fichiers depuis votre messagerie, puis envoyez.</p>
+    </div>
+
     <!-- ENQUÊTE DE SATISFACTION -->
     <div id="survey-block" style="margin:18px 0;padding:16px;background:var(--accent-soft,#E4F3F4);border:1px solid var(--accent-line,#A9DCE0);border-radius:12px;text-align:left">
       <div style="font-weight:700;font-size:14px;color:var(--accent-d,#0A7280);margin-bottom:4px;text-align:center">📝 Votre avis compte</div>
@@ -696,6 +713,7 @@
             <th>Châssis</th>
             <th>Code dom.</th>
             <th onclick="sortHisto('statut')" style="cursor:pointer" title="Trier">Statut <span id="sort-statut"></span></th>
+            <th>Responsable</th>
             <th>Prise en charge</th><th>Commentaire</th><th>Action</th>
           </tr></thead>
           <tbody id="histo-body"></tbody>
@@ -740,6 +758,17 @@
         <select class="sp-statut" id="sp-statut" onchange="onStatutChange()"></select>
         <!-- Bouton étape suivante (workflow CCR) -->
         <button type="button" id="sp-next-step" onclick="etapeSuivanteCCR()" style="display:none;width:100%;margin-top:10px;padding:9px;background:var(--accent-d,#0A7280);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer">➡️ Passer à l'étape suivante</button>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Traité par</label>
+        <select id="sp-responsable">
+          <option value="">— Sélectionner —</option>
+          <option value="Nico">Nico</option>
+          <option value="Marion">Marion</option>
+          <option value="Céline">Céline</option>
+          <option value="Tahir">Tahir</option>
+          <option value="Omar">Omar</option>
+        </select>
       </div>
       <div class="field" style="margin-top:12px">
         <label>Commentaire <span class="opt">(optionnel)</span></label>
