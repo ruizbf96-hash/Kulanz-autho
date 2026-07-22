@@ -131,7 +131,10 @@
         Se connecter
       </button>
       <div style="text-align:center;margin-top:10px">
-        <span style="color:rgba(255,255,255,.35);font-size:10px">Mot de passe oublié ? Réinitialisation via la console Firebase.</span>
+        <button onclick="demandeResetMdp()" type="button"
+          style="background:none;border:none;color:rgba(255,255,255,.55);font-size:12px;cursor:pointer;text-decoration:underline;padding:0">
+          🔑 Mot de passe oublié ?
+        </button>
       </div>
       <button class="lp-back" onclick="retourStep1Team()">← Retour</button>
     </div>
@@ -976,40 +979,38 @@ function connecterTeam() {
     });
 }
 
-// La réinitialisation du mot de passe se fait manuellement par la TeamGarantie
-// (console Firebase). Aucune réinitialisation par e-mail automatique Firebase n'est utilisée.
-
-// "Mot de passe oublié ?" : envoie une DEMANDE de réinitialisation à la TeamGarantie
-// (via Web3Forms, comme la notif de nouvelle demande). La TeamGarantie réinitialise ensuite manuellement.
+// "Mot de passe oublié ?" : envoi AUTOMATIQUE d'un e-mail de réinitialisation Firebase.
+// L'utilisateur reçoit un lien et redéfinit lui-même son mot de passe (aucune action TeamGarantie).
 function demandeResetMdp() {
   var email = (document.getElementById('auth-email') ? document.getElementById('auth-email').value : '').trim();
-  var site  = (typeof G !== 'undefined' && G.site) ? G.site : '';
+  if (!email) {
+    // essayer le champ e-mail de l'espace TeamGarantie si présent
+    var te = document.getElementById('team-email');
+    if (te && te.value) email = te.value.trim();
+  }
   if (!email) { alert('Saisissez d\'abord votre e-mail @geauto.fr, puis cliquez sur « Mot de passe oublié ? ».'); var ae=document.getElementById('auth-email'); if(ae) ae.focus(); return; }
   if (!email.toLowerCase().endsWith('@geauto.fr')) { alert('Utilisez votre e-mail @geauto.fr.'); return; }
 
-  if (!confirm('Envoyer une demande de réinitialisation de mot de passe à la TeamGarantie pour :\n\n' + email + (site ? '\n(site : ' + site + ')' : '') + ' ?')) return;
+  if (!confirm('Envoyer un e-mail de réinitialisation de mot de passe à :\n\n' + email + '\n\nVous recevrez un lien pour définir un nouveau mot de passe.')) return;
 
-  var KEY = (typeof WEB3_KEY !== 'undefined') ? WEB3_KEY : '7bf5b927-e39f-4fc1-9f60-642e4741e445';
-  var corps = 'DEMANDE DE RÉINITIALISATION DE MOT DE PASSE\n'
-    + '----------------------------------------\n'
-    + 'Compte concerné : ' + email + '\n'
-    + (site ? 'Site : ' + site + '\n' : '')
-    + 'Date : ' + new Date().toLocaleString('fr-FR') + '\n\n'
-    + 'Merci de réinitialiser le mot de passe de ce compte dans la console Firebase\n'
-    + '(Authentication > Users), puis de communiquer le nouveau mot de passe à l\'utilisateur.';
+  if (typeof firebase === 'undefined' || !firebase.auth) {
+    alert('⚠️ Service indisponible. Contactez teamgarantie@geauto.fr.');
+    return;
+  }
 
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: KEY,
-      subject: '[RESET MDP] Demande de réinitialisation – ' + email,
-      message: corps,
-      from_name: 'Réinitialisation mot de passe',
-      replyto: email
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(function() {
+      alert('✅ E-mail envoyé à ' + email + '\n\nConsultez votre boîte de réception (et les spams) et suivez le lien pour définir un nouveau mot de passe.\n\nLe lien est valable 1 heure.');
     })
-  })
-  .then(function(){ alert('✅ Votre demande a été transmise à la TeamGarantie.\nVous serez recontacté avec un nouveau mot de passe.'); })
-  .catch(function(){ alert('⚠️ Envoi impossible pour le moment.\nContactez directement teamgarantie@geauto.fr.'); });
+    .catch(function(err) {
+      var msg = 'Impossible d\'envoyer l\'e-mail.';
+      if (err && err.code === 'auth/user-not-found') msg = 'Aucun compte trouvé avec cet e-mail.\nVérifiez l\'adresse ou contactez la TeamGarantie.';
+      else if (err && err.code === 'auth/invalid-email') msg = 'Adresse e-mail invalide.';
+      else if (err && err.code === 'auth/too-many-requests') msg = 'Trop de tentatives. Réessayez dans quelques minutes.';
+      else if (err && err.code === 'auth/network-request-failed') msg = 'Problème de connexion réseau. Vérifiez votre connexion et réessayez.';
+      console.warn('Reset MDP:', err);
+      alert('⚠️ ' + msg + '\n\nSi le problème persiste, contactez teamgarantie@geauto.fr.');
+    });
 }
 
 function retourStep1Team() {
