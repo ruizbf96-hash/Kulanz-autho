@@ -254,6 +254,9 @@
         <button class="btn-logout" onclick="changerMonMdp()" title="Changer mon mot de passe" style="border-color:var(--accent-line);color:var(--accent-d)">
           🔑 Mot de passe
         </button>
+        <button class="btn-logout" id="btn-debloquer" onclick="ouvrirDeblocage()" title="Envoyer un lien de réinitialisation à un utilisateur bloqué" style="display:none;border-color:#F0D5A8;color:#B26A00">
+          🆘 Débloquer un utilisateur
+        </button>
         <button class="btn-logout" onclick="deconnecter()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Déconnexion
@@ -668,6 +671,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
           Envoyer la demande
         </button>
+        <button type="button" class="btn-primary" id="btn-enregistrer-modifs" onclick="enregistrerModifsExistante()" style="display:none;background:#0A7280">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Enregistrer les modifications
+        </button>
         <button type="button" class="btn-secondary" id="btn-pdf" onclick="genererPDF()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Enregistrer en PDF
@@ -804,6 +811,28 @@
 </div>
 
 <!-- ══ MODAL VIDER HISTORIQUE ══ -->
+<!-- MODALE : débloquer un utilisateur (envoi lien de réinitialisation) -->
+<div id="debloc-modal">
+  <div class="vm-box">
+    <div class="vm-icon">🆘</div>
+    <div class="vm-title">Débloquer un utilisateur</div>
+    <div class="vm-step active">
+      <div class="vm-sub">Envoie un <strong>lien de réinitialisation</strong> à un collègue qui ne peut plus se connecter. Il recevra un e-mail pour choisir un nouveau mot de passe.</div>
+      <div class="field">
+        <label>E-mail du compte bloqué <span class="req">*</span></label>
+        <input type="email" id="debloc-email" placeholder="prenom.nom@geauto.fr" onkeydown="if(event.key==='Enter')envoyerLienDeblocage()">
+        <div class="vm-pwd-err" id="debloc-err"></div>
+      </div>
+      <div id="debloc-ok" style="display:none;background:#E8F6EF;border:1px solid #A9DCC5;color:#0B7A6E;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-top:10px"></div>
+      <div class="vm-warn" style="margin-top:10px">💡 Si le collègue ne reçoit rien après 2 minutes, demandez-lui de vérifier ses spams. En dernier recours, contactez l'administrateur de l'application.</div>
+      <div class="vm-btns" style="margin-top:14px">
+        <button class="vm-btn-cancel" onclick="fermerDeblocage()">Fermer</button>
+        <button class="vm-btn-confirm" onclick="envoyerLienDeblocage()" style="background:#0A7280">📧 Envoyer le lien</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="vider-modal">
   <div class="vm-box">
     <div class="vm-icon">🗑️</div>
