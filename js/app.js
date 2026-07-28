@@ -355,6 +355,7 @@ function ouvrirApp() {
 
   if (G.role === 'team') {
     ge('h-role').textContent = '🔐 TeamGarantie';
+    var _bd = ge('btn-debloquer'); if (_bd) _bd.style.display = '';
     // TeamGarantie: accès total — formulaire + historique + tous les sites
     ge('site-bar').style.display = 'block'; // Visible pour choisir le site
     ge('dash-wrap').classList.add('on');
@@ -368,6 +369,7 @@ function ouvrirApp() {
     renderKulanzForm('VW Bischheim'); // défaut VW pour TeamGarantie
   } else {
     ge('h-role').textContent = '👤 ' + G.site;
+    var _bd2 = ge('btn-debloquer'); if (_bd2) _bd2.style.display = 'none';
     ge('site-bar').style.display = 'none';
     ge('h-site-name').textContent = G.site;
     // Remplir les champs site dans le formulaire
@@ -1718,6 +1720,8 @@ function nouvelleDemande() {
   G.editOnly = false;
   G._dirty = false;
   clearReopenBanner();
+  var _bem = ge('btn-enregistrer-modifs'); if (_bem) _bem.style.display = 'none';
+  G.reopenId = null;
   var _bv=ge('btn-envoyer');
   if(_bv){ var _svg=_bv.querySelector('svg'); _bv.innerHTML=(_svg?_svg.outerHTML:'')+' Envoyer la demande'; }
   ge('mainForm').reset();
@@ -2249,6 +2253,7 @@ function getDemandeById(id) {
 function openDemande(id) {
   var d = getDemandeById(id);
   if (!d) { toast('⚠ Demande introuvable.'); return; }
+  G.reopenId = String(id);
 
   var statut = d.statut || 'En attente';
   var estFinalisee = statutEstTraite(statut);
@@ -2280,14 +2285,32 @@ function openDemande(id) {
     var svg = bv.querySelector('svg');
     bv.innerHTML = (svg ? svg.outerHTML : '') + ' ' + lbl;
   }
+  // Second bouton "Enregistrer les modifications" : seulement quand une demande finalisée
+  // est rouverte (permet de MODIFIER la demande existante au lieu d'en créer une nouvelle)
+  var bem = ge('btn-enregistrer-modifs');
+  if (bem) bem.style.display = (!G.editOnly && estFinalisee) ? 'inline-flex' : 'none';
 
   toast(G.editOnly ? '✏ Modification — enregistrez sans envoi de mail.'
         : (estFinalisee ? '📄 Demande dupliquée — ajustez puis envoyez.' : '✏ Demande rouverte en modification.'));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Enregistrer les modifications sur la demande existante (au lieu d'en créer une nouvelle)
+// Utilisé quand une demande finalisée est rouverte et qu'on veut juste corriger
+// (ex : code dommage / code avarie) sans créer de doublon ni renvoyer de mail.
+function enregistrerModifsExistante() {
+  var id = G.activeId || G.reopenId;
+  if (!id) { toast('Aucune demande à modifier.'); return; }
+  G.editOnly = true;
+  G.editingId = String(id);
+  envoyerFormulaire(); // passe dans la branche editOnly (met à jour, sans mail)
+}
+
+function enregistrerModifsExistante_END() {}
+
 // Affiche/actualise un bandeau au-dessus du formulaire
 function showReopenBanner(estFinalisee, d) {
+
   var host = ge('mainForm');
   if (!host) return;
   var old = ge('reopen-banner'); if (old) old.remove();
@@ -2318,6 +2341,7 @@ function showReopenBanner(estFinalisee, d) {
 
 function clearReopenBanner() {
   var b = ge('reopen-banner'); if (b) b.remove();
+  var bem = ge('btn-enregistrer-modifs'); if (bem) bem.style.display = 'none';
 }
 
 // Annule la réouverture : repart sur un formulaire vierge
@@ -2531,10 +2555,10 @@ function validerSP() {
     .then(function() {
       closeSP(); renderHisto(); renderDash();
       toast('✔ Statut mis à jour : '+statut);
-      // Envoi mail : CCR → statuts finaux (PEC / sans PEC) + Complément requis ; Kulanz → statuts traités
+      // Envoi mail : CCR → statuts finaux (Validée/sans participation) + Complément requis ; Kulanz → Complément requis, Traitée, Traitée sans participation
       var doitEnvoyer = (d.type === 'CCR')
         ? (CCR_MAIL.indexOf(statut) !== -1)
-        : (statut !== 'En attente' && statut !== 'Complément requis');
+        : (statut === 'Complément requis' || statut === 'Traitée' || statut === 'Traitée sans participation');
       if (doitEnvoyer) {
         envoyerMailKulanz(d, statut, commentaire, commerce);
       }
@@ -2591,8 +2615,25 @@ function envoyerMailKulanz(d, statut, commentaire, commerce) {
   var ccPart = (dest.toLowerCase() !== 'teamgarantie@geauto.fr') ? '&cc=' + encodeURIComponent('teamgarantie@geauto.fr') : '';
   var mailto = 'mailto:' + dest + '?subject=' + sujetEnc + ccPart + '&body=' + corpsEnc;
 
-  window.location.href = mailto;
+  ouvrirMailto(mailto);
   toast('✔ Mail préparé dans Outlook — vérifiez avant d\'envoyer');
+}
+
+// Ouverture robuste d'un mailto (fiable même après fermeture d'un panneau)
+function ouvrirMailto(mailto) {
+  setTimeout(function() {
+    try {
+      var a = document.createElement('a');
+      a.href = mailto;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ if (a.parentNode) a.parentNode.removeChild(a); }, 500);
+    } catch (e) {
+      // repli : méthode classique
+      try { window.location.href = mailto; } catch (e2) { console.warn('mailto:', e2); }
+    }
+  }, 150);
 }
 
 
@@ -3315,7 +3356,60 @@ function envoyerDocsMailto(d, useChecklist) {
   var mailto = 'mailto:teamgarantie@geauto.fr'
     + '?subject=' + encodeURIComponent(sujet)
     + '&body=' + encodeURIComponent(corps.substring(0, 1800));
-  window.location.href = mailto;
+  ouvrirMailto(mailto);
   toast('📧 E-mail préparé — joignez vos documents puis envoyez.');
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// DÉBLOCAGE D'UN UTILISATEUR (TeamGarantie)
+// Envoie un lien de réinitialisation à un collègue bloqué,
+// sans console Firebase et sans droits administrateur.
+// ═══════════════════════════════════════════════════════════
+function ouvrirDeblocage() {
+  if (G.role !== 'team') { toast('Réservé à la TeamGarantie.'); return; }
+  var m = ge('debloc-modal'); if (!m) return;
+  var inp = ge('debloc-email'); if (inp) inp.value = '';
+  var err = ge('debloc-err'); if (err) { err.style.display = 'none'; err.textContent = ''; }
+  var ok = ge('debloc-ok'); if (ok) { ok.style.display = 'none'; ok.textContent = ''; }
+  m.classList.add('open');
+  if (inp) setTimeout(function(){ inp.focus(); }, 100);
+}
+
+function fermerDeblocage() {
+  var m = ge('debloc-modal'); if (m) m.classList.remove('open');
+}
+
+function envoyerLienDeblocage() {
+  var inp = ge('debloc-email');
+  var err = ge('debloc-err');
+  var ok  = ge('debloc-ok');
+  var showErr = function(msg) { if (err) { err.textContent = msg; err.style.display = 'block'; } if (ok) ok.style.display = 'none'; };
+
+  var email = inp ? inp.value.trim() : '';
+  if (!email) { showErr('Saisissez l\'e-mail du compte bloqué.'); return; }
+  if (!email.toLowerCase().endsWith('@geauto.fr')) { showErr('L\'adresse doit être en @geauto.fr.'); return; }
+  if (typeof firebase === 'undefined' || !firebase.auth) { showErr('Service indisponible. Réessayez plus tard.'); return; }
+
+  if (err) err.style.display = 'none';
+
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(function() {
+      if (ok) {
+        ok.innerHTML = '✅ Lien envoyé à <strong>' + esc(email) + '</strong>.<br>'
+          + 'Prévenez ce collègue : il doit ouvrir l\'e-mail « Réinitialisation » et suivre le lien (valable 1 heure).';
+        ok.style.display = 'block';
+      }
+      if (inp) inp.value = '';
+      toast('📧 Lien de réinitialisation envoyé.');
+    })
+    .catch(function(e) {
+      var msg = 'Envoi impossible.';
+      if (e && e.code === 'auth/user-not-found') msg = 'Aucun compte avec cet e-mail. Vérifiez l\'orthographe.';
+      else if (e && e.code === 'auth/invalid-email') msg = 'Adresse e-mail invalide.';
+      else if (e && e.code === 'auth/too-many-requests') msg = 'Trop de tentatives. Patientez quelques minutes.';
+      else if (e && e.code === 'auth/network-request-failed') msg = 'Problème de réseau. Vérifiez la connexion.';
+      console.warn('Déblocage:', e);
+      showErr(msg);
+    });
+}
